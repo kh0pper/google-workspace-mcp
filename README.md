@@ -208,11 +208,11 @@ expected**. Copy the full address‑bar URL and paste it back into the terminal.
 The server speaks MCP over stdio, so it works with any MCP client. For a
 **FERPA‑friendly, fully local** setup, pair it with **[crow](https://maestro.press/software/crow/)** —
 a self‑hosted agentic framework and MCP platform. Run crow with a **local model**
-(Ollama or any OpenAI‑compatible endpoint) and nothing leaves your network. A
-**one‑click crow extension** that installs this server from Crow's **Extensions**
-panel is on the [roadmap](#roadmap); today you connect it as a standard MCP server
-using the configuration below — which also works in other MCP clients (such as
-Claude Code or Claude Desktop).
+(Ollama or any OpenAI‑compatible endpoint) and nothing leaves your network. You can
+**install it in one click** from Crow's **Extensions** panel (it's in the
+[official add‑on registry](https://github.com/kh0pper/crow-addons)), or connect it
+as a standard MCP server using the configuration below — which also works in other
+MCP clients (such as Claude Code or Claude Desktop).
 
 A copy‑paste starting point is in [`.mcp.json.example`](./.mcp.json.example).
 
@@ -233,8 +233,9 @@ Replace `/absolute/path/to/google-workspace-mcp` with the folder you cloned.
 (If you installed it onto your PATH with `pipx install .` or `uv tool install .`,
 you can use `"command": "google-workspace-mcp"` with no `args` instead.)
 
-- **crow (recommended):** add the server entry to crow's MCP configuration so the
-  whole pipeline stays local (a one‑click extension is coming — see Roadmap).
+- **crow (recommended):** open Crow's **Extensions** panel and install **Google
+  Workspace** in one click (or just ask your AI: *"Install the Google Workspace
+  add-on"*), so the whole pipeline stays on your own hardware.
 - **Claude Code:** add the block above to a `.mcp.json` in your project, or run
   `claude mcp add`. Restart and approve the server.
 - **Other clients (Claude Desktop, etc.):** add the same server entry to that
@@ -316,9 +317,9 @@ protected data.
 
 ## Roadmap
 
-- **One‑click crow extension:** package this server with **crow** and a local LLM
-  so a school can run the whole thing on‑premises — student data never leaves the
-  building — and set it up in a single step.
+- **One‑click crow extension — shipped.** Installable from Crow's **Extensions**
+  panel via the [official add‑on registry](https://github.com/kh0pper/crow-addons).
+- **Publish to PyPI** so `uvx google-workspace-mcp` works without the git URL.
 - **Consulting:** crow plus tools like this are offered to help districts and
   administrators stand up open‑source, FERPA‑compliant AI on their own
   infrastructure.

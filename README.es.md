@@ -222,11 +222,11 @@ El servidor habla MCP por stdio, así que funciona con cualquier cliente MCP. Pa
 una configuración **compatible con FERPA y totalmente local**, combínalo con
 **[crow](https://maestro.press/software/crow/)** — un marco agéntico y plataforma
 MCP autoalojado. Ejecuta crow con un **modelo local** (Ollama o cualquier endpoint
-compatible con OpenAI) y nada sale de tu red. Una **extensión de crow de un solo
-clic** que instala este servidor desde el panel de **Extensiones** de Crow está en
-la [hoja de ruta](#hoja-de-ruta); por ahora lo conectas como un servidor MCP
-estándar con la configuración de abajo, que también funciona en otros clientes MCP
-(como Claude Code o Claude Desktop).
+compatible con OpenAI) y nada sale de tu red. Puedes **instalarlo con un solo clic**
+desde el panel de **Extensiones** de Crow (está en el
+[registro oficial de add‑ons](https://github.com/kh0pper/crow-addons)), o conectarlo
+como un servidor MCP estándar con la configuración de abajo, que también funciona en
+otros clientes MCP (como Claude Code o Claude Desktop).
 
 Tienes un punto de partida listo para copiar en
 [`.mcp.json.example`](./.mcp.json.example).
@@ -248,9 +248,9 @@ Reemplaza `/absolute/path/to/google-workspace-mcp` con la carpeta que clonaste.
 (Si lo instalaste en tu PATH con `pipx install .` o `uv tool install .`, puedes
 usar `"command": "google-workspace-mcp"` sin `args`.)
 
-- **crow (recomendado):** agrega la entrada del servidor a la configuración MCP de
-  crow para que toda la canalización permanezca local (una extensión de un clic
-  está en camino; consulta la Hoja de ruta).
+- **crow (recomendado):** abre el panel de **Extensiones** de Crow e instala
+  **Google Workspace** con un solo clic (o pídeselo a tu IA: *«Instala el add‑on de
+  Google Workspace»*), para que todo permanezca en tu propio hardware.
 - **Claude Code:** agrega el bloque anterior a un `.mcp.json` en tu proyecto, o
   ejecuta `claude mcp add`. Reinicia y aprueba el servidor.
 - **Otros clientes (Claude Desktop, etc.):** agrega la misma entrada de servidor al
@@ -336,9 +336,10 @@ usar esto con datos protegidos.
 
 ## Hoja de ruta
 
-- **Extensión de crow de un clic:** empaquetar este servidor con **crow** y un LLM
-  local para que una escuela pueda ejecutar todo en sus propias instalaciones — los
-  datos de los estudiantes nunca salen del edificio — y configurarlo en un solo paso.
+- **Extensión de crow de un clic — ya disponible.** Se instala desde el panel de
+  **Extensiones** de Crow a través del
+  [registro oficial de add‑ons](https://github.com/kh0pper/crow-addons).
+- **Publicar en PyPI** para que `uvx google-workspace-mcp` funcione sin la URL de git.
 - **Consultoría:** crow y herramientas como esta se ofrecen para ayudar a distritos
   y administradores a poner en marcha IA de código abierto y compatible con FERPA en
   su propia infraestructura.
