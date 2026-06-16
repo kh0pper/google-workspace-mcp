@@ -1,12 +1,21 @@
 # Google Workspace MCP Server
 
-Give any MCP‑capable AI assistant safe, structured access to **your own** Google
-Workspace — Drive, Docs, Sheets, Slides, Gmail, and Calendar — using your own
-Google account. It runs locally on your computer or server and talks to Google
-with credentials that never leave your machine.
+**English** · [Español](./README.es.md)
 
-It works with any client that speaks the [Model Context Protocol](https://modelcontextprotocol.io)
-(Claude Code, Claude Desktop, and others), so it is **not tied to any one AI**.
+Give a **local‑first AI assistant** safe, structured access to **your own** Google
+Workspace — Drive, Docs, Sheets, Slides, Gmail, and Calendar — using your own
+Google account, running entirely on your computer or server. Your credentials
+never leave your machine.
+
+It's built to pair with **crow**, a local‑first AI assistant ecosystem, so schools
+and other privacy‑sensitive organizations can put AI to work on their own data
+**without sending it to a third party** (see [Data privacy & FERPA](#data-privacy--ferpa)).
+Because it speaks the open [Model Context Protocol](https://modelcontextprotocol.io),
+it also works with any other MCP client (such as Claude Code or Claude Desktop) —
+so you're never locked in.
+
+> _Part of an effort to help school administrators adopt open‑source,
+> FERPA‑compliant AI tools, paired with crow._
 
 > **Who this guide is for.** It is written for non‑technical readers, including
 > school administrators. You do **not** need to be a programmer. Where your
@@ -192,12 +201,19 @@ expected**. Copy the full address‑bar URL and paste it back into the terminal.
 
 ---
 
-## Part 4 — Connect it to your AI
+## Part 4 — Connect it to your AI (crow recommended)
 
-The server speaks MCP over stdio. Add it to your client's MCP configuration.
+The server speaks MCP over stdio, so it works with any MCP client. For a
+**FERPA‑friendly, fully local** setup, pair it with **crow** — a local‑first AI
+assistant ecosystem — so the AI model runs on your own hardware and your data
+never leaves the building (see [Data privacy & FERPA](#data-privacy--ferpa)). A
+one‑click crow extension is on the [roadmap](#roadmap); today you add it to crow
+like any MCP server, using the configuration below. The same configuration also
+works in other MCP clients (such as Claude Code or Claude Desktop).
+
 A copy‑paste starting point is in [`.mcp.json.example`](./.mcp.json.example).
 
-**Generic MCP config:**
+**MCP server configuration:**
 
 ```json
 {
@@ -214,10 +230,12 @@ Replace `/absolute/path/to/google-workspace-mcp` with the folder you cloned.
 (If you installed it onto your PATH with `pipx install .` or `uv tool install .`,
 you can use `"command": "google-workspace-mcp"` with no `args` instead.)
 
+- **crow (recommended):** add the server entry to crow's MCP configuration so the
+  whole pipeline stays local (a one‑click extension is coming — see Roadmap).
 - **Claude Code:** add the block above to a `.mcp.json` in your project, or run
   `claude mcp add`. Restart and approve the server.
-- **Claude Desktop / other clients:** add the same server entry to that client's
-  MCP config file.
+- **Other clients (Claude Desktop, etc.):** add the same server entry to that
+  client's MCP config file.
 
 ---
 
@@ -234,10 +252,11 @@ whether data leaves your control:
   their input. For student records, treat that as a disclosure to a third party
   that must be covered by your district's policies and data‑processing
   agreements **before** you use it.
-- **Local / self‑hosted AI models** (for example the **crow** ecosystem,
-  [Ollama](https://ollama.com), or other on‑premises models) keep everything on
-  your own computer or server — there is **no third‑party disclosure**, which is
-  what makes a **FERPA‑compliant deployment possible**.
+- **Local / self‑hosted AI models** keep everything on your own computer or
+  server — there is **no third‑party disclosure**, which is what makes a
+  **FERPA‑compliant deployment possible**. **crow** is built for exactly this: a
+  local‑first AI assistant that runs the model on your own hardware. (Other
+  on‑premises options such as [Ollama](https://ollama.com) work too.)
 
 Keeping data local *enables* compliance; it does not by itself *guarantee* it
 (access controls and your district's policies still apply). **Follow your
@@ -293,9 +312,12 @@ protected data.
 
 ## Roadmap
 
-- **One‑click "crow extension":** package this server with a **local LLM** so a
-  school can run the whole thing on‑premises — student data never leaves the
-  building.
+- **One‑click crow extension:** package this server with **crow** and a local LLM
+  so a school can run the whole thing on‑premises — student data never leaves the
+  building — and set it up in a single step.
+- **Consulting:** crow plus tools like this are offered to help districts and
+  administrators stand up open‑source, FERPA‑compliant AI on their own
+  infrastructure.
 
 ## License
 
