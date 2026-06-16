@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "google-workspace": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/absolute/path/to/google-workspace-mcp",
+        "google-workspace-mcp"
+      ],
+      "env": {
+        "GOOGLE_CREDENTIALS_FILE": "/home/you/.config/google-workspace-mcp/credentials.json",
+        "GOOGLE_TOKEN_FILE": "/home/you/.config/google-workspace-mcp/token.json"
+      }
+    }
+  }
+}

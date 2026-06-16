@@ -1,0 +1,643 @@
+"""
+Google Docs API tools — read, write, and structure operations.
+
+All tools return structured dicts via @handle_google_errors.
+No full-document replace tool exists (deliberate guardrail).
+"""
+
+import asyncio
+import logging
+from typing import Optional
+
+from .auth import get_docs_service, get_drive_service
+from .docs_formatting import docs_structure_to_markdown, markdown_to_docs_requests
+from .guardrails import handle_google_errors, build_heading_inheritance_fix
+
+logger = logging.getLogger(__name__)
+
+
+def _get_doc_structure(doc_id: str) -> dict:
+    """Fetch full document structure (blocking)."""
+    docs = get_docs_service()
+    return docs.documents().get(documentId=doc_id).execute()
+
+
+def _parse_headings(doc: dict) -> list[dict]:
+    """Extract heading outline from document structure."""
+    headings = []
+    body_content = doc.get("body", {}).get("content", [])
+
+    for element in body_content:
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        para_style = paragraph.get("paragraphStyle", {})
+        named_style = para_style.get("namedStyleType", "NORMAL_TEXT")
+
+        if not named_style.startswith("HEADING_"):
+            continue
+
+        level = int(named_style.split("_")[1])
+        text = ""
+        for elem in paragraph.get("elements", []):
+            tr = elem.get("textRun")
+            if tr:
+                text += tr.get("content", "").strip()
+
+        if text:
+            headings.append({
+                "level": level,
+                "text": text,
+                "start_index": element.get("startIndex", 0),
+                "end_index": element.get("endIndex", 0),
+            })
+
+    return headings
+
+
+def _find_section_range(
+    headings: list[dict], body_content: list[dict], heading_text: str
+) -> Optional[tuple[int, int, int]]:
+    """
+    Find the content range for a section identified by heading text.
+
+    Returns (heading_start, section_end, heading_level) or None.
+    The section_end is the start of the next heading at same or higher level,
+    or the end of the document.
+    """
+    target = None
+    for i, h in enumerate(headings):
+        if h["text"].lower().strip() == heading_text.lower().strip():
+            target = i
+            break
+
+    if target is None:
+        return None
+
+    heading = headings[target]
+    heading_start = heading["start_index"]
+    heading_level = heading["level"]
+
+    # Find end: next heading at same or higher level
+    section_end = None
+    for h in headings[target + 1:]:
+        if h["level"] <= heading_level:
+            section_end = h["start_index"]
+            break
+
+    if section_end is None:
+        # End of document
+        for element in reversed(body_content):
+            if "endIndex" in element:
+                section_end = element["endIndex"]
+                break
+        if section_end is None:
+            section_end = heading["end_index"]
+
+    return heading_start, section_end, heading_level
+
+
+@handle_google_errors
+async def gdocs_read(doc_id: str) -> dict:
+    """Read a Google Doc as markdown via rich structure reading."""
+    doc = await asyncio.to_thread(_get_doc_structure, doc_id)
+
+    body = doc.get("body", {})
+    lists_info = doc.get("lists", {})
+    title = doc.get("title", "")
+
+    markdown = docs_structure_to_markdown(body, title, lists_info)
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "title": title,
+            "markdown": markdown,
+            "modified_time": doc.get("revisionId", ""),
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_get_structure(doc_id: str) -> dict:
+    """Return the heading outline with index positions."""
+    doc = await asyncio.to_thread(_get_doc_structure, doc_id)
+    headings = _parse_headings(doc)
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "title": doc.get("title", ""),
+            "headings": headings,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_read_section(doc_id: str, heading: str) -> dict:
+    """Read a single section by heading name (reduces token usage)."""
+    doc = await asyncio.to_thread(_get_doc_structure, doc_id)
+    headings_list = _parse_headings(doc)
+    body_content = doc.get("body", {}).get("content", [])
+    lists_info = doc.get("lists", {})
+
+    result = _find_section_range(headings_list, body_content, heading)
+    if result is None:
+        return {
+            "success": False,
+            "error": f"Heading '{heading}' not found. Available: {[h['text'] for h in headings_list]}",
+        }
+
+    section_start, section_end, _ = result
+
+    # Extract just the elements in this range
+    section_body = {
+        "content": [
+            el for el in body_content
+            if el.get("startIndex", 0) >= section_start
+            and el.get("endIndex", 0) <= section_end
+        ]
+    }
+
+    markdown = docs_structure_to_markdown(section_body, "", lists_info)
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "heading": heading,
+            "markdown": markdown,
+            "start_index": section_start,
+            "end_index": section_end,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_find_replace(
+    doc_id: str,
+    find: Optional[str] = None,
+    replace: Optional[str] = None,
+    match_case: bool = True,
+    pairs: Optional[list[dict]] = None,
+) -> dict:
+    """
+    Find-replace preserving formatting. Single pair or batch via `pairs` list.
+
+    For single: provide find + replace.
+    For batch: provide pairs=[{"find": "...", "replace": "..."}, ...].
+    Batch executes as a SINGLE batchUpdate call (atomic).
+    """
+    docs = get_docs_service()
+
+    replacements = []
+    if pairs:
+        replacements = pairs
+    elif find is not None and replace is not None:
+        replacements = [{"find": find, "replace": replace}]
+    else:
+        return {"success": False, "error": "Provide find+replace or pairs list."}
+
+    requests = []
+    for pair in replacements:
+        requests.append({
+            "replaceAllText": {
+                "containsText": {
+                    "text": pair["find"],
+                    "matchCase": pair.get("match_case", match_case),
+                },
+                "replaceText": pair["replace"],
+            }
+        })
+
+    result = await asyncio.to_thread(
+        lambda: docs.documents().batchUpdate(
+            documentId=doc_id, body={"requests": requests}
+        ).execute()
+    )
+
+    replies = result.get("replies", [])
+    counts = []
+    for i, reply in enumerate(replies):
+        count = reply.get("replaceAllText", {}).get("occurrencesChanged", 0)
+        counts.append({
+            "find": replacements[i]["find"],
+            "replace": replacements[i]["replace"],
+            "occurrences": count,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "replacements": counts,
+            "total_changes": sum(c["occurrences"] for c in counts),
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_append(doc_id: str, markdown: str) -> dict:
+    """Append formatted markdown to end of document."""
+    docs = get_docs_service()
+
+    # Get current end index
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().get(documentId=doc_id).execute()
+    )
+    body_content = doc.get("body", {}).get("content", [])
+    end_index = 1
+    for element in body_content:
+        if "endIndex" in element:
+            end_index = max(end_index, element["endIndex"])
+
+    insert_at = end_index - 1
+    requests, new_end = markdown_to_docs_requests(markdown, start_index=insert_at)
+
+    if requests:
+        await asyncio.to_thread(
+            lambda: docs.documents().batchUpdate(
+                documentId=doc_id, body={"requests": requests}
+            ).execute()
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "inserted_at": insert_at,
+            "new_end_index": new_end,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_insert_at_heading(
+    doc_id: str, heading: str, markdown: str
+) -> dict:
+    """
+    Insert content after a specific heading.
+
+    Guardrail: auto-applies NORMAL_TEXT reset to prevent heading style inheritance.
+    """
+    docs = get_docs_service()
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().get(documentId=doc_id).execute()
+    )
+
+    headings_list = _parse_headings(doc)
+    body_content = doc.get("body", {}).get("content", [])
+
+    # Find the target heading
+    target = None
+    for h in headings_list:
+        if h["text"].lower().strip() == heading.lower().strip():
+            target = h
+            break
+
+    if target is None:
+        return {
+            "success": False,
+            "error": f"Heading '{heading}' not found. Available: {[h['text'] for h in headings_list]}",
+        }
+
+    # Insert after the heading's end index
+    insert_at = target["end_index"]
+    requests, new_end = markdown_to_docs_requests(markdown, start_index=insert_at)
+
+    # Guardrail: reset all inserted content to NORMAL_TEXT to prevent heading inheritance
+    if requests:
+        requests.append(build_heading_inheritance_fix(insert_at, new_end))
+
+        await asyncio.to_thread(
+            lambda: docs.documents().batchUpdate(
+                documentId=doc_id, body={"requests": requests}
+            ).execute()
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "heading": heading,
+            "inserted_at": insert_at,
+            "new_end_index": new_end,
+            "heading_inheritance_fix_applied": True,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_replace_section(
+    doc_id: str, heading: str, markdown: str
+) -> dict:
+    """
+    Replace content between two headings (safe heading-to-heading delete+reinsert).
+
+    Guardrail: uses delete+reinsert pattern instead of positional inserts.
+    Replaces everything between the target heading and the next same-or-higher-level heading.
+    The heading itself is preserved.
+    """
+    docs = get_docs_service()
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().get(documentId=doc_id).execute()
+    )
+
+    headings_list = _parse_headings(doc)
+    body_content = doc.get("body", {}).get("content", [])
+
+    result = _find_section_range(headings_list, body_content, heading)
+    if result is None:
+        return {
+            "success": False,
+            "error": f"Heading '{heading}' not found. Available: {[h['text'] for h in headings_list]}",
+        }
+
+    heading_start, section_end, heading_level = result
+
+    # Find the heading's end index (content starts after it)
+    content_start = None
+    for h in headings_list:
+        if h["start_index"] == heading_start:
+            content_start = h["end_index"]
+            break
+
+    if content_start is None or content_start >= section_end:
+        return {
+            "success": False,
+            "error": f"Section '{heading}' has no content to replace.",
+        }
+
+    # Step 1: Delete existing section content (after heading, before next heading)
+    delete_request = {
+        "deleteContentRange": {
+            "range": {
+                "startIndex": content_start,
+                "endIndex": section_end - 1,  # Preserve the newline before next heading
+            }
+        }
+    }
+
+    # Step 2: Insert new content at the deletion point
+    insert_requests, new_end = markdown_to_docs_requests(markdown, start_index=content_start)
+
+    # Step 3: Reset to NORMAL_TEXT (heading inheritance guardrail)
+    all_requests = [delete_request] + insert_requests
+    if insert_requests:
+        all_requests.append(build_heading_inheritance_fix(content_start, new_end))
+
+    await asyncio.to_thread(
+        lambda: docs.documents().batchUpdate(
+            documentId=doc_id, body={"requests": all_requests}
+        ).execute()
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "heading": heading,
+            "old_range": {"start": content_start, "end": section_end},
+            "new_end_index": new_end,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_create(
+    folder_id: str,
+    title: str,
+    content: str = "",
+    find_existing: bool = True,
+) -> dict:
+    """
+    Create a new Google Doc in a folder.
+
+    With find_existing=True (default), searches for an existing doc with the same
+    title in the folder first, returning it instead of creating a duplicate.
+    """
+    drive = get_drive_service()
+    docs = get_docs_service()
+
+    if find_existing:
+        safe_title = title.replace("\\", "\\\\").replace("'", "\\'")
+        query = (
+            f"name = '{safe_title}' and '{folder_id}' in parents "
+            f"and mimeType = 'application/vnd.google-apps.document' and trashed = false"
+        )
+        result = await asyncio.to_thread(
+            lambda: drive.files().list(
+                q=query, spaces="drive",
+                fields="files(id, name, webViewLink)",
+            ).execute()
+        )
+        files = result.get("files", [])
+        if files:
+            return {
+                "success": True,
+                "data": {
+                    "doc_id": files[0]["id"],
+                    "title": files[0]["name"],
+                    "web_view_link": files[0].get("webViewLink"),
+                    "created": False,
+                },
+            }
+
+    # Create new document
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().create(body={"title": title}).execute()
+    )
+    doc_id = doc["documentId"]
+
+    # Move to target folder
+    await asyncio.to_thread(
+        lambda: drive.files().update(
+            fileId=doc_id,
+            addParents=folder_id,
+            removeParents="root",
+            fields="id, parents",
+        ).execute()
+    )
+
+    # Insert content if provided
+    if content.strip():
+        insert_requests, _ = markdown_to_docs_requests(content, start_index=1)
+        if insert_requests:
+            await asyncio.to_thread(
+                lambda: docs.documents().batchUpdate(
+                    documentId=doc_id, body={"requests": insert_requests}
+                ).execute()
+            )
+
+    # Get final metadata
+    file_meta = await asyncio.to_thread(
+        lambda: drive.files().get(
+            fileId=doc_id,
+            fields="id, name, webViewLink, modifiedTime",
+        ).execute()
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "title": file_meta["name"],
+            "web_view_link": file_meta.get("webViewLink"),
+            "created": True,
+        },
+    }
+
+
+@handle_google_errors
+async def gdocs_rewrite_passages(
+    doc_id: str, passages: list[dict]
+) -> dict:
+    """
+    Rewrite specific paragraphs by anchored prefix match.
+
+    Each item in `passages` has:
+      - match_prefix (str): the first 30-100 characters of the paragraph to rewrite.
+        Must match the paragraph's text content starting from index 0 (after any
+        leading whitespace is trimmed). Case-sensitive. The match is performed at
+        paragraph granularity — a paragraph is matched by checking that its
+        leading text (after lstrip) startswith match_prefix.
+      - new_text (str): the rewritten paragraph text. May contain '\\n' to split
+        into multiple paragraphs, in which case the original single paragraph is
+        replaced by the corresponding multiple paragraphs.
+
+    Replacement strategy: for each matched paragraph, the tool deletes the entire
+    paragraph content via deleteContentRange (preserving the trailing newline that
+    marks the paragraph break) and inserts new_text at the deletion point. All
+    replacements are processed in REVERSE document order within a single
+    batchUpdate so index shifts from earlier deletes do not invalidate later
+    operations.
+
+    Returns per-passage status: matched (bool), paragraph_range, original_length,
+    new_length. Pairs that did not match leave the doc unchanged.
+
+    Use case: agent has identified specific paragraphs containing rule violations
+    (em-dashes, hedging, banned vocab) and wants to swap each one for a properly
+    rewritten version. Paragraph-anchored replacement is far more reliable than
+    surrounding-context find/replace for prose-scale edits.
+    """
+    docs = get_docs_service()
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().get(documentId=doc_id).execute()
+    )
+    body_content = doc.get("body", {}).get("content", [])
+
+    paragraphs = []
+    for elem in body_content:
+        para = elem.get("paragraph")
+        if not para:
+            continue
+        text = "".join(
+            r.get("textRun", {}).get("content", "")
+            for r in para.get("elements", [])
+        )
+        paragraphs.append({
+            "start": elem.get("startIndex"),
+            "end": elem.get("endIndex"),
+            "text": text,
+        })
+
+    matches = []
+    used_paragraph_starts = set()
+    for p in passages:
+        prefix = (p.get("match_prefix") or "").strip()
+        new_text = p.get("new_text") or ""
+        if not prefix:
+            matches.append({
+                "match_prefix": "",
+                "matched": False,
+                "error": "Empty match_prefix",
+            })
+            continue
+        # Truncate the prefix to avoid hyper-long fingerprints
+        anchor = prefix[:100]
+        found = None
+        for pg in paragraphs:
+            if pg["start"] in used_paragraph_starts:
+                continue
+            stripped = pg["text"].lstrip()
+            if stripped.startswith(anchor):
+                found = pg
+                break
+        if found is None:
+            matches.append({
+                "match_prefix": anchor[:60],
+                "matched": False,
+                "error": "No paragraph starts with this prefix",
+            })
+            continue
+        used_paragraph_starts.add(found["start"])
+        matches.append({
+            "match_prefix": anchor[:60],
+            "matched": True,
+            "paragraph_range": {"start": found["start"], "end": found["end"]},
+            "original_length": len(found["text"]),
+            "new_length": len(new_text),
+            "_paragraph": found,
+            "_new_text": new_text,
+        })
+
+    # Build batchUpdate requests in REVERSE document order so index shifts
+    # from earlier replacements don't break the indices of later ones.
+    matched = [m for m in matches if m.get("matched")]
+    matched.sort(key=lambda m: m["_paragraph"]["start"], reverse=True)
+
+    requests = []
+    for m in matched:
+        pg = m["_paragraph"]
+        new_text = m["_new_text"]
+        start_idx = pg["start"]
+        end_idx = pg["end"]
+        # The paragraph's text typically ends with '\n' which marks the paragraph
+        # break. Preserve that final '\n' by deleting up to end_idx - 1.
+        # If the paragraph somehow has no trailing newline (very rare — last para
+        # of doc body), just delete the whole range.
+        if pg["text"].endswith("\n"):
+            delete_end = end_idx - 1
+        else:
+            delete_end = end_idx
+        if delete_end > start_idx:
+            requests.append({
+                "deleteContentRange": {
+                    "range": {"startIndex": start_idx, "endIndex": delete_end}
+                }
+            })
+        if new_text:
+            requests.append({
+                "insertText": {
+                    "location": {"index": start_idx},
+                    "text": new_text,
+                }
+            })
+
+    if requests:
+        await asyncio.to_thread(
+            lambda: docs.documents().batchUpdate(
+                documentId=doc_id, body={"requests": requests}
+            ).execute()
+        )
+
+    # Strip internal '_paragraph' / '_new_text' before returning
+    clean_results = []
+    for m in matches:
+        clean_results.append({
+            k: v for k, v in m.items() if not k.startswith("_")
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "total_passages": len(passages),
+            "matched": sum(1 for m in matches if m.get("matched")),
+            "applied_requests": len(requests),
+            "results": clean_results,
+        },
+    }
