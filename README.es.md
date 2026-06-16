@@ -7,13 +7,15 @@ Google Workspace — Drive, Documentos, Hojas de cálculo, Presentaciones, Gmail
 Calendar — usando tu propia cuenta de Google, ejecutándose por completo en tu
 computadora o servidor. Tus credenciales nunca salen de tu equipo.
 
-Está pensado para combinarse con **crow**, un ecosistema de asistente de IA local,
-para que las escuelas y otras organizaciones sensibles a la privacidad puedan poner
-la IA a trabajar sobre sus propios datos **sin enviarlos a terceros** (consulta
-[Privacidad de datos y FERPA](#privacidad-de-datos-y-ferpa)). Como utiliza el
-[Model Context Protocol](https://modelcontextprotocol.io) abierto, también funciona
-con cualquier otro cliente MCP (como Claude Code o Claude Desktop), así que nunca
-quedas atado a una sola IA.
+Está pensado para combinarse con **[crow](https://maestro.press/software/crow-overview/)** —
+un marco agéntico y plataforma MCP autoalojado y de
+[código abierto](https://github.com/kh0pper/crow), diseñado explícitamente para
+entornos sensibles a FERPA — para que las escuelas y otras organizaciones sensibles
+a la privacidad puedan poner la IA a trabajar sobre sus propios datos **sin
+enviarlos a terceros** (consulta [Privacidad de datos y FERPA](#privacidad-de-datos-y-ferpa)).
+Como utiliza el [Model Context Protocol](https://modelcontextprotocol.io) abierto,
+también funciona con cualquier otro cliente MCP (como Claude Code o Claude Desktop),
+así que nunca quedas atado a una sola IA.
 
 > _Parte de un esfuerzo por ayudar a administradores escolares a adoptar
 > herramientas de IA de código abierto y compatibles con FERPA, en conjunto con crow._
@@ -218,13 +220,13 @@ pégala de vuelta en la terminal.
 
 El servidor habla MCP por stdio, así que funciona con cualquier cliente MCP. Para
 una configuración **compatible con FERPA y totalmente local**, combínalo con
-**crow** — un ecosistema de asistente de IA local — para que el modelo de IA se
-ejecute en tu propio hardware y tus datos nunca salgan del edificio (consulta
-[Privacidad de datos y FERPA](#privacidad-de-datos-y-ferpa)). Una extensión de crow
-de un solo clic está en la [hoja de ruta](#hoja-de-ruta); por ahora lo agregas a
-crow como cualquier servidor MCP, con la configuración de abajo. La misma
-configuración también funciona en otros clientes MCP (como Claude Code o Claude
-Desktop).
+**[crow](https://maestro.press/software/crow/)** — un marco agéntico y plataforma
+MCP autoalojado. Ejecuta crow con un **modelo local** (Ollama o cualquier endpoint
+compatible con OpenAI) y nada sale de tu red. Una **extensión de crow de un solo
+clic** que instala este servidor desde el panel de **Extensiones** de Crow está en
+la [hoja de ruta](#hoja-de-ruta); por ahora lo conectas como un servidor MCP
+estándar con la configuración de abajo, que también funciona en otros clientes MCP
+(como Claude Code o Claude Desktop).
 
 Tienes un punto de partida listo para copiar en
 [`.mcp.json.example`](./.mcp.json.example).
@@ -271,9 +273,10 @@ que recupera se entrega luego a **cualquier modelo de IA que use tu cliente**, y
   de tratamiento de datos de tu distrito **antes** de usarlo.
 - **Modelos de IA locales / autoalojados** mantienen todo en tu propia computadora
   o servidor: **no hay divulgación a terceros**, que es lo que hace **posible una
-  implementación compatible con FERPA**. **crow** está hecho precisamente para
-  esto: un asistente de IA local que ejecuta el modelo en tu propio hardware.
-  (También funcionan otras opciones locales como [Ollama](https://ollama.com).)
+  implementación compatible con FERPA**. **[crow](https://maestro.press/software/crow/)**
+  está hecho precisamente para esto: una plataforma autoalojada que combinas con un
+  modelo local ([Ollama](https://ollama.com) o cualquier endpoint compatible con
+  OpenAI) para que tus datos permanezcan en una infraestructura que tú controlas.
 
 Mantener los datos en local *facilita* el cumplimiento; no lo *garantiza* por sí
 solo (también aplican los controles de acceso y las políticas de tu distrito).
@@ -342,6 +345,4 @@ usar esto con datos protegidos.
 
 ## Licencia
 
-Aún sin licencia: por ahora es "todos los derechos reservados" (puedes verlo, pero
-todavía no se concede su reutilización). Más adelante podría añadirse una licencia
-permisiva.
+[MIT](./LICENSE) © Maestro Press. Libre para usar, modificar y distribuir.

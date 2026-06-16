@@ -3,6 +3,8 @@ name = "google-workspace-mcp"
 version = "0.1.0"
 description = "Google Workspace MCP server — unified Drive, Docs, Sheets, Slides, Gmail, and Calendar tools with built-in guardrails"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Maestro Press" }]
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",

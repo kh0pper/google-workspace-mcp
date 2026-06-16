@@ -7,9 +7,11 @@ Workspace — Drive, Docs, Sheets, Slides, Gmail, and Calendar — using your ow
 Google account, running entirely on your computer or server. Your credentials
 never leave your machine.
 
-It's built to pair with **crow**, a local‑first AI assistant ecosystem, so schools
-and other privacy‑sensitive organizations can put AI to work on their own data
-**without sending it to a third party** (see [Data privacy & FERPA](#data-privacy--ferpa)).
+It's built to pair with **[crow](https://maestro.press/software/crow-overview/)** —
+a self‑hosted, [open‑source](https://github.com/kh0pper/crow) agentic framework and
+MCP platform explicitly built for FERPA‑sensitive settings — so schools and other
+privacy‑sensitive organizations can put AI to work on their own data **without
+sending it to a third party** (see [Data privacy & FERPA](#data-privacy--ferpa)).
 Because it speaks the open [Model Context Protocol](https://modelcontextprotocol.io),
 it also works with any other MCP client (such as Claude Code or Claude Desktop) —
 so you're never locked in.
@@ -204,12 +206,13 @@ expected**. Copy the full address‑bar URL and paste it back into the terminal.
 ## Part 4 — Connect it to your AI (crow recommended)
 
 The server speaks MCP over stdio, so it works with any MCP client. For a
-**FERPA‑friendly, fully local** setup, pair it with **crow** — a local‑first AI
-assistant ecosystem — so the AI model runs on your own hardware and your data
-never leaves the building (see [Data privacy & FERPA](#data-privacy--ferpa)). A
-one‑click crow extension is on the [roadmap](#roadmap); today you add it to crow
-like any MCP server, using the configuration below. The same configuration also
-works in other MCP clients (such as Claude Code or Claude Desktop).
+**FERPA‑friendly, fully local** setup, pair it with **[crow](https://maestro.press/software/crow/)** —
+a self‑hosted agentic framework and MCP platform. Run crow with a **local model**
+(Ollama or any OpenAI‑compatible endpoint) and nothing leaves your network. A
+**one‑click crow extension** that installs this server from Crow's **Extensions**
+panel is on the [roadmap](#roadmap); today you connect it as a standard MCP server
+using the configuration below — which also works in other MCP clients (such as
+Claude Code or Claude Desktop).
 
 A copy‑paste starting point is in [`.mcp.json.example`](./.mcp.json.example).
 
@@ -254,9 +257,10 @@ whether data leaves your control:
   agreements **before** you use it.
 - **Local / self‑hosted AI models** keep everything on your own computer or
   server — there is **no third‑party disclosure**, which is what makes a
-  **FERPA‑compliant deployment possible**. **crow** is built for exactly this: a
-  local‑first AI assistant that runs the model on your own hardware. (Other
-  on‑premises options such as [Ollama](https://ollama.com) work too.)
+  **FERPA‑compliant deployment possible**. **[crow](https://maestro.press/software/crow/)**
+  is built for exactly this — a self‑hosted platform you pair with a local model
+  ([Ollama](https://ollama.com) or any OpenAI‑compatible endpoint) so your data
+  stays on infrastructure you control.
 
 Keeping data local *enables* compliance; it does not by itself *guarantee* it
 (access controls and your district's policies still apply). **Follow your
@@ -321,5 +325,4 @@ protected data.
 
 ## License
 
-No license yet — for now this is "all rights reserved" (you may view it, but
-reuse isn't yet granted). A permissive license may be added later.
+[MIT](./LICENSE) © Maestro Press. Free to use, modify, and distribute.
