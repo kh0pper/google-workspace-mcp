@@ -30,14 +30,14 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**70 herramientas** en siete servicios de Google:
+**72 herramientas** en siete servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
 | **Documentos** | Leer, buscar y editar de forma segura Google Docs (incl. comentarios) | 14 |
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
-| **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; dar formato a celdas | 8 |
+| **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; formato numérico y visual (colores/bordes/anchos/inmovilizar) | 10 |
 | **Drive** | Buscar, listar, organizar, **copiar**, renombrar, enviar a la papelera, transferir propiedad y crear accesos directos a archivos y carpetas | 11 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
 | **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
@@ -292,7 +292,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (70 herramientas)
+## Referencia de herramientas (72 herramientas)
 
 - **Documentos (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -312,9 +312,9 @@ usar esto con datos protegidos.
   `gdrive_create_shortcut`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Hojas de cálculo (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+- **Hojas de cálculo (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
   `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
-  `sheets_delete_tab`, `sheets_set_number_format`.
+  `sheets_delete_tab`, `sheets_set_number_format`, `sheets_get_tabs`, `sheets_batch_update`.
 - **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,
   `apps_script_update_content`, `apps_script_run`. Requiere la API de Apps Script
   habilitada + el interruptor por usuario en script.google.com/home/usersettings;

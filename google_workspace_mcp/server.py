@@ -592,6 +592,18 @@ async def sheets_set_number_format(
     return await sheets.sheets_set_number_format(spreadsheet_id, range, pattern=pattern, format_type=format_type)
 
 
+@mcp.tool()
+async def sheets_get_tabs(spreadsheet_id: str) -> dict:
+    """List every tab with numeric sheetId, index, grid size, frozen-row/col counts, hidden flag. Call before sheets_batch_update (whose GridRanges reference tabs by sheetId, not name)."""
+    return await sheets.sheets_get_tabs(spreadsheet_id)
+
+
+@mcp.tool()
+async def sheets_batch_update(spreadsheet_id: str, requests: list) -> dict:
+    """Power tool: raw Sheets spreadsheets.batchUpdate passthrough for visual formatting (header bold/background, frozen rows/cols, column widths, borders, banded rows, hide columns, etc.). GridRanges reference tabs by numeric sheetId from sheets_get_tabs."""
+    return await sheets.sheets_batch_update(spreadsheet_id, requests)
+
+
 # --- Apps Script Tools (read/edit/push .gs project source; run functions) ---
 
 @mcp.tool()

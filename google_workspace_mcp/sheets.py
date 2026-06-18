@@ -353,6 +353,58 @@ async def sheets_rename_tab(spreadsheet_id: str, title: str, new_title: str) -> 
 
 
 @handle_google_errors
+async def sheets_get_tabs(spreadsheet_id: str) -> dict:
+    """List every tab with its numeric sheetId, index, grid size, frozen-row/col
+    counts, and hidden flag. batchUpdate GridRanges reference a tab by sheetId (not
+    name), so call this first to get the ids you need for sheets_batch_update."""
+    svc = get_sheets_service()
+    res = await asyncio.to_thread(
+        lambda: svc.spreadsheets().get(
+            spreadsheetId=spreadsheet_id,
+            fields=("sheets.properties(title,sheetId,index,hidden,"
+                    "gridProperties(rowCount,columnCount,frozenRowCount,frozenColumnCount))"),
+        ).execute()
+    )
+    tabs = []
+    for s in res.get("sheets", []):
+        p = s["properties"]
+        g = p.get("gridProperties", {})
+        tabs.append({
+            "title": p.get("title"),
+            "sheet_id": p.get("sheetId"),
+            "index": p.get("index"),
+            "hidden": p.get("hidden", False),
+            "rows": g.get("rowCount"),
+            "columns": g.get("columnCount"),
+            "frozen_rows": g.get("frozenRowCount", 0),
+            "frozen_columns": g.get("frozenColumnCount", 0),
+        })
+    return {"success": True, "data": {"spreadsheet_id": spreadsheet_id, "tabs": tabs}}
+
+
+@handle_google_errors
+async def sheets_batch_update(spreadsheet_id: str, requests: list) -> dict:
+    """Power tool: raw Sheets API spreadsheets.batchUpdate passthrough — for visual
+    formatting the other tools don't cover (header bold/background colors, frozen
+    rows/cols, column widths, borders, banded rows, hiding helper columns, etc.).
+    `requests` is a list of request dicts (repeatCell, updateDimensionProperties,
+    updateSheetProperties, updateBorders, addBanding, …). GridRanges reference a tab by
+    numeric sheetId — get them from sheets_get_tabs first."""
+    svc = get_sheets_service()
+    if not isinstance(requests, list) or not requests:
+        raise ValueError("requests must be a non-empty list of batchUpdate request dicts")
+    res = await _batch_update(svc, spreadsheet_id, requests)
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "applied": len(requests),
+            "replies": res.get("replies", []),
+        },
+    }
+
+
+@handle_google_errors
 async def sheets_delete_tab(spreadsheet_id: str, title: str) -> dict:
     """Delete a tab by name. DESTRUCTIVE and not undoable via the API — the
     caller is responsible for confirming intent first."""

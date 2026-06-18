@@ -29,14 +29,14 @@ so you're never locked in.
 
 ## What it can do
 
-**70 tools** across seven Google services:
+**72 tools** across seven Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
 | **Docs** | Read, search, and safely edit Google Docs (incl. comments) | 14 |
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
-| **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; set cell formats | 8 |
+| **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; number + visual formatting (colors/borders/widths/freeze) | 10 |
 | **Drive** | Search, list, organize, **copy**, rename, trash, transfer ownership, and shortcut files and folders | 11 |
 | **Calendar** | List/read/create events, respond to invites | 5 |
 | **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
@@ -277,7 +277,7 @@ protected data.
 
 ---
 
-## Tool reference (70 tools)
+## Tool reference (72 tools)
 
 - **Docs (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -296,9 +296,9 @@ protected data.
   `gdrive_create_shortcut`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Sheets (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+- **Sheets (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
   `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
-  `sheets_delete_tab`, `sheets_set_number_format`.
+  `sheets_delete_tab`, `sheets_set_number_format`, `sheets_get_tabs`, `sheets_batch_update`.
 - **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,
   `apps_script_update_content`, `apps_script_run`. Requires the Apps Script API
   enabled + the per‑user toggle at script.google.com/home/usersettings;
