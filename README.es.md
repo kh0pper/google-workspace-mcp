@@ -30,7 +30,7 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**68 herramientas** en siete servicios de Google:
+**70 herramientas** en siete servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
@@ -38,7 +38,7 @@ así que nunca quedas atado a una sola IA.
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
 | **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; dar formato a celdas | 8 |
-| **Drive** | Buscar, listar, organizar, **copiar**, renombrar y enviar a la papelera archivos y carpetas | 9 |
+| **Drive** | Buscar, listar, organizar, **copiar**, renombrar, enviar a la papelera, transferir propiedad y crear accesos directos a archivos y carpetas | 11 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
 | **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
 
@@ -292,7 +292,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (68 herramientas)
+## Referencia de herramientas (70 herramientas)
 
 - **Documentos (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -306,9 +306,10 @@ usar esto con datos protegidos.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (9):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+- **Drive (11):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
   `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`,
-  `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`.
+  `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`, `gdrive_transfer_ownership`,
+  `gdrive_create_shortcut`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
 - **Hojas de cálculo (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),

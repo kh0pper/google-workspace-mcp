@@ -29,7 +29,7 @@ so you're never locked in.
 
 ## What it can do
 
-**68 tools** across seven Google services:
+**70 tools** across seven Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
@@ -37,7 +37,7 @@ so you're never locked in.
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
 | **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; set cell formats | 8 |
-| **Drive** | Search, list, organize, **copy**, rename, and trash files and folders | 9 |
+| **Drive** | Search, list, organize, **copy**, rename, trash, transfer ownership, and shortcut files and folders | 11 |
 | **Calendar** | List/read/create events, respond to invites | 5 |
 | **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
 
@@ -277,7 +277,7 @@ protected data.
 
 ---
 
-## Tool reference (68 tools)
+## Tool reference (70 tools)
 
 - **Docs (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -290,9 +290,10 @@ protected data.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (9):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+- **Drive (11):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
   `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`,
-  `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`.
+  `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`, `gdrive_transfer_ownership`,
+  `gdrive_create_shortcut`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
 - **Sheets (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),

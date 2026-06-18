@@ -360,3 +360,72 @@ async def gdrive_rename(file_id: str, new_name: str) -> dict:
             "renamed": True,
         },
     }
+
+
+@handle_google_errors
+async def gdrive_transfer_ownership(file_id: str, new_owner_email: str) -> dict:
+    """Transfer ownership of a Drive file/folder to another user (by email). Within the
+    SAME Google Workspace domain the transfer is immediate; for consumer/cross-domain the
+    recipient must accept first (returns pending_owner=True). IMPORTANT: transferring a
+    FOLDER does NOT re-own the files inside it — every item keeps its own owner, so to
+    re-home a whole tree you must transfer each contained file too (walk the tree)."""
+    drive = get_drive_service()
+    result = await asyncio.to_thread(
+        lambda: drive.permissions().create(
+            fileId=file_id,
+            body={"type": "user", "role": "owner", "emailAddress": new_owner_email},
+            transferOwnership=True,
+            sendNotificationEmail=True,
+            fields="id, role, emailAddress, pendingOwner",
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "new_owner": new_owner_email,
+            "permission_id": result.get("id"),
+            "role": result.get("role"),
+            "pending_owner": result.get("pendingOwner", False),
+        },
+    }
+
+
+@handle_google_errors
+async def gdrive_create_shortcut(
+    target_id: str, parent_id: str, name: Optional[str] = None
+) -> dict:
+    """Create a Drive shortcut (a pointer) to target_id, placed inside parent_id. If
+    name is omitted, the shortcut takes the target's name. Works across drives — e.g. a
+    shortcut in a Shared Drive that points at a My Drive folder (supportsAllDrives)."""
+    drive = get_drive_service()
+    shortcut_name = name
+    if not shortcut_name:
+        target = await asyncio.to_thread(
+            lambda: drive.files().get(
+                fileId=target_id, fields="name", supportsAllDrives=True
+            ).execute()
+        )
+        shortcut_name = target.get("name")
+    body = {
+        "name": shortcut_name,
+        "mimeType": "application/vnd.google-apps.shortcut",
+        "parents": [parent_id],
+        "shortcutDetails": {"targetId": target_id},
+    }
+    result = await asyncio.to_thread(
+        lambda: drive.files().create(
+            body=body,
+            fields="id, name, parents, shortcutDetails",
+            supportsAllDrives=True,
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": result["id"],
+            "name": result.get("name"),
+            "parents": result.get("parents", []),
+            "target_id": target_id,
+        },
+    }

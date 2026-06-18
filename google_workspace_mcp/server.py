@@ -207,6 +207,18 @@ async def gdrive_rename(file_id: str, new_name: str) -> dict:
     return await drive.gdrive_rename(file_id, new_name)
 
 
+@mcp.tool()
+async def gdrive_transfer_ownership(file_id: str, new_owner_email: str) -> dict:
+    """Transfer ownership of a Drive file/folder to another user by email. Same-domain (Workspace) = immediate; consumer/cross-domain = recipient must accept (pending_owner=True). NOTE: transferring a folder does NOT re-own the files inside it — walk the tree and transfer each item to re-home a whole directory."""
+    return await drive.gdrive_transfer_ownership(file_id, new_owner_email)
+
+
+@mcp.tool()
+async def gdrive_create_shortcut(target_id: str, parent_id: str, name: str | None = None) -> dict:
+    """Create a Drive shortcut (pointer) to target_id inside parent_id (name defaults to the target's). Works across drives — e.g. a shortcut in a Shared Drive pointing at a My Drive folder."""
+    return await drive.gdrive_create_shortcut(target_id, parent_id, name=name)
+
+
 # --- Comments Tools ---
 
 @mcp.tool()
