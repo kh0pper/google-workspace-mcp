@@ -38,7 +38,7 @@ así que nunca quedas atado a una sola IA.
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
 | **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; dar formato a celdas | 8 |
-| **Drive** | Buscar, listar, organizar, **copiar** y enviar a la papelera archivos y carpetas | 8 |
+| **Drive** | Buscar, listar, organizar, **copiar**, renombrar y enviar a la papelera archivos y carpetas | 9 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
 | **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
 

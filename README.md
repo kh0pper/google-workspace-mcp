@@ -37,7 +37,7 @@ so you're never locked in.
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
 | **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; set cell formats | 8 |
-| **Drive** | Search, list, organize, **copy**, and trash files and folders | 8 |
+| **Drive** | Search, list, organize, **copy**, rename, and trash files and folders | 9 |
 | **Calendar** | List/read/create events, respond to invites | 5 |
 | **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
 
