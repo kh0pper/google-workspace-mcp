@@ -93,7 +93,7 @@ async def gdrive_get_metadata(file_id: str) -> dict:
     result = await asyncio.to_thread(
         lambda: drive.files().get(
             fileId=file_id,
-            fields="id, name, mimeType, modifiedTime, createdTime, parents, webViewLink, size",
+            fields="id, name, mimeType, modifiedTime, createdTime, parents, webViewLink, size, shortcutDetails",
         ).execute()
     )
 
@@ -108,6 +108,9 @@ async def gdrive_get_metadata(file_id: str) -> dict:
             "parents": result.get("parents", []),
             "web_view_link": result.get("webViewLink"),
             "size": result.get("size"),
+            # For shortcuts: {"targetId": ..., "targetMimeType": ...} so the
+            # real target can be resolved/moved; absent for non-shortcut files.
+            "shortcut_details": result.get("shortcutDetails"),
         },
     }
 
@@ -308,5 +311,42 @@ async def gdrive_trash_file(file_id: str) -> dict:
             "id": result["id"],
             "name": result.get("name"),
             "trashed": result.get("trashed", True),
+        },
+    }
+
+
+@handle_google_errors
+async def gdrive_rename(file_id: str, new_name: str) -> dict:
+    """Rename a Drive file or folder. Changes the display name ONLY — the file ID
+    is unchanged, so links, add-on configs, IMPORTRANGE, and anything that
+    references the item by ID keep working. Returns old_name + name
+    (renamed=False if the name was already new_name)."""
+    drive = get_drive_service()
+    current = await asyncio.to_thread(
+        lambda: drive.files().get(fileId=file_id, fields="id, name").execute()
+    )
+    old_name = current.get("name")
+    if old_name == new_name:
+        return {
+            "success": True,
+            "data": {
+                "id": current["id"],
+                "old_name": old_name,
+                "name": old_name,
+                "renamed": False,
+            },
+        }
+    result = await asyncio.to_thread(
+        lambda: drive.files().update(
+            fileId=file_id, body={"name": new_name}, fields="id, name"
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": result["id"],
+            "old_name": old_name,
+            "name": result.get("name"),
+            "renamed": True,
         },
     }

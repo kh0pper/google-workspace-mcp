@@ -201,6 +201,12 @@ async def gdrive_trash_file(file_id: str) -> dict:
     return await drive.gdrive_trash_file(file_id)
 
 
+@mcp.tool()
+async def gdrive_rename(file_id: str, new_name: str) -> dict:
+    """Rename a Drive file or folder. Changes the display name ONLY — the file ID is unchanged, so links, add-on configs, IMPORTRANGE, and anything that references it by ID keep working. Returns old_name + name."""
+    return await drive.gdrive_rename(file_id, new_name)
+
+
 # --- Comments Tools ---
 
 @mcp.tool()
