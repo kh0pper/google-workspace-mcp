@@ -4,7 +4,7 @@ Google Sheets API v4 tools — read/write/append/list cell values in a spreadshe
 
 import asyncio
 import logging
-from typing import Optional
+import re
 
 from .auth import get_sheets_service
 from .guardrails import handle_google_errors
@@ -95,18 +95,39 @@ async def sheets_list(spreadsheet_id: str) -> dict:
     }
 
 
+_VALUE_RENDER_OPTIONS = {"FORMATTED_VALUE", "UNFORMATTED_VALUE", "FORMULA"}
+
+
 @handle_google_errors
-async def sheets_read(spreadsheet_id: str, range: str) -> dict:
+async def sheets_read(
+    spreadsheet_id: str, range: str, value_render_option: str = "FORMATTED_VALUE"
+) -> dict:
     """Read cell values from an A1 range (e.g. 'Sheet1' or 'Sheet1!A1:E50').
 
     Returns rows as a list of lists; trailing empty cells/rows are omitted by
     the API, so rows may be ragged.
+
+    `value_render_option` controls what each cell returns:
+      - FORMATTED_VALUE (default) — the displayed value, as a string
+      - UNFORMATTED_VALUE — the underlying value without display formatting
+      - FORMULA — the cell's formula (e.g. '=IF(K2<>"",K2,J2)') instead of its
+        computed result; use this to inspect/trace formulas without round-tripping
     """
+    render = (value_render_option or "FORMATTED_VALUE").upper()
+    if render not in _VALUE_RENDER_OPTIONS:
+        return {
+            "success": False,
+            "error": (
+                f"Invalid value_render_option {value_render_option!r}; "
+                f"expected one of {sorted(_VALUE_RENDER_OPTIONS)}."
+            ),
+        }
     svc = get_sheets_service()
     result = await asyncio.to_thread(
         lambda: svc.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
             range=range,
+            valueRenderOption=render,
         ).execute()
     )
     values = result.get("values", [])
@@ -115,6 +136,7 @@ async def sheets_read(spreadsheet_id: str, range: str) -> dict:
         "data": {
             "spreadsheet_id": spreadsheet_id,
             "range": result.get("range", range),
+            "value_render_option": render,
             "row_count": len(values),
             "values": values,
         },
@@ -193,5 +215,193 @@ async def sheets_append(
             "updated_range": updates.get("updatedRange", ""),
             "updated_rows": updates.get("updatedRows", 0),
             "updated_cells": updates.get("updatedCells", 0),
+        },
+    }
+
+
+# --- Tab management (batchUpdate) + number formatting ---------------------
+#
+# Structural operations the Sheets values API can't do: create/rename/delete
+# whole tabs and set a range's number format (e.g. force TEXT '@' so IDs,
+# leading-zero codes, and dates are stored verbatim instead of being coerced
+# to numbers/dates).
+
+_A1_CELL = re.compile(r"^\s*([A-Za-z]+)?(\d+)?\s*$")
+
+
+def _col_to_index(letters: str) -> int:
+    """A1 column letters -> 0-based index ('A'->0, 'Z'->25, 'AA'->26)."""
+    idx = 0
+    for ch in letters.upper():
+        idx = idx * 26 + (ord(ch) - ord("A") + 1)
+    return idx - 1
+
+
+def _split_cell(cell: str):
+    """'A1' -> ('A', 1); 'A' -> ('A', None); '2' -> (None, 2)."""
+    m = _A1_CELL.match(cell)
+    if not m or (m.group(1) is None and m.group(2) is None):
+        raise ValueError(f"Bad A1 cell reference: {cell!r}")
+    col, row = m.group(1), m.group(2)
+    return (col or None, int(row) if row else None)
+
+
+async def _sheet_props(svc, spreadsheet_id: str) -> list:
+    res = await asyncio.to_thread(
+        lambda: svc.spreadsheets().get(
+            spreadsheetId=spreadsheet_id,
+            fields="sheets.properties(title,sheetId)",
+        ).execute()
+    )
+    return [s["properties"] for s in res.get("sheets", [])]
+
+
+async def _resolve_sheet_id(svc, spreadsheet_id: str, title: str) -> int:
+    for p in await _sheet_props(svc, spreadsheet_id):
+        if p.get("title") == title:
+            return p.get("sheetId")
+    raise ValueError(f"No tab named {title!r} in this spreadsheet.")
+
+
+async def _a1_to_gridrange(svc, spreadsheet_id: str, a1: str) -> dict:
+    """Convert an A1 range with a tab name ('Tab!A1:C10', 'Tab!A:A', 'Tab!2:5')
+    into a GridRange for batchUpdate. The tab name is required so the range is
+    unambiguous about which sheet it targets."""
+    if "!" not in a1:
+        raise ValueError(
+            f"Range {a1!r} must include a tab name, e.g. 'Tab!A1:C10'."
+        )
+    sheet_part, rng = a1.rsplit("!", 1)
+    sheet_title = sheet_part.strip().strip("'").replace("''", "'")
+    gr = {"sheetId": await _resolve_sheet_id(svc, spreadsheet_id, sheet_title)}
+    rng = rng.strip()
+    if not rng:
+        return gr
+    start, end = rng.split(":", 1) if ":" in rng else (rng, rng)
+    sc, sr = _split_cell(start)
+    ec, er = _split_cell(end)
+    if sc is not None:
+        gr["startColumnIndex"] = _col_to_index(sc)
+    if ec is not None:
+        gr["endColumnIndex"] = _col_to_index(ec) + 1
+    if sr is not None:
+        gr["startRowIndex"] = sr - 1
+    if er is not None:
+        gr["endRowIndex"] = er
+    return gr
+
+
+async def _batch_update(svc, spreadsheet_id: str, requests: list) -> dict:
+    return await asyncio.to_thread(
+        lambda: svc.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id, body={"requests": requests}
+        ).execute()
+    )
+
+
+@handle_google_errors
+async def sheets_add_tab(
+    spreadsheet_id: str,
+    title: str,
+    rows: int = 1000,
+    columns: int = 26,
+    index: int | None = None,
+) -> dict:
+    """Create a new tab/sheet. `index` (optional) is its 0-based position."""
+    svc = get_sheets_service()
+    props = {
+        "title": title,
+        "gridProperties": {"rowCount": rows, "columnCount": columns},
+    }
+    if index is not None:
+        props["index"] = index
+    res = await _batch_update(
+        svc, spreadsheet_id, [{"addSheet": {"properties": props}}]
+    )
+    added = res["replies"][0]["addSheet"]["properties"]
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "title": added.get("title"),
+            "sheet_id": added.get("sheetId"),
+            "index": added.get("index"),
+        },
+    }
+
+
+@handle_google_errors
+async def sheets_rename_tab(spreadsheet_id: str, title: str, new_title: str) -> dict:
+    """Rename a tab from `title` to `new_title`."""
+    svc = get_sheets_service()
+    sheet_id = await _resolve_sheet_id(svc, spreadsheet_id, title)
+    await _batch_update(svc, spreadsheet_id, [{
+        "updateSheetProperties": {
+            "properties": {"sheetId": sheet_id, "title": new_title},
+            "fields": "title",
+        }
+    }])
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "sheet_id": sheet_id,
+            "old_title": title,
+            "new_title": new_title,
+        },
+    }
+
+
+@handle_google_errors
+async def sheets_delete_tab(spreadsheet_id: str, title: str) -> dict:
+    """Delete a tab by name. DESTRUCTIVE and not undoable via the API — the
+    caller is responsible for confirming intent first."""
+    svc = get_sheets_service()
+    sheet_id = await _resolve_sheet_id(svc, spreadsheet_id, title)
+    await _batch_update(
+        svc, spreadsheet_id, [{"deleteSheet": {"sheetId": sheet_id}}]
+    )
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "deleted_title": title,
+            "sheet_id": sheet_id,
+        },
+    }
+
+
+@handle_google_errors
+async def sheets_set_number_format(
+    spreadsheet_id: str,
+    range: str,
+    pattern: str = "@",
+    format_type: str = "TEXT",
+) -> dict:
+    """Set the number format of a range (must include a tab name, e.g.
+    'Sheet1!A2:A200'). Defaults force plain TEXT ('@') so IDs, leading-zero
+    codes, and dates are stored verbatim. `format_type` is a Sheets
+    NumberFormatType (TEXT, NUMBER, PERCENT, CURRENCY, DATE, TIME, DATE_TIME,
+    SCIENTIFIC); `pattern` is the format string for that type."""
+    svc = get_sheets_service()
+    grid = await _a1_to_gridrange(svc, spreadsheet_id, range)
+    await _batch_update(svc, spreadsheet_id, [{
+        "repeatCell": {
+            "range": grid,
+            "cell": {
+                "userEnteredFormat": {
+                    "numberFormat": {"type": format_type, "pattern": pattern}
+                }
+            },
+            "fields": "userEnteredFormat.numberFormat",
+        }
+    }])
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "range": range,
+            "format_type": format_type,
+            "pattern": pattern,
         },
     }

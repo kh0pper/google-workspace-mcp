@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
-from . import docs, drive, comments, gmail, sheets, slides
+from . import docs, drive, comments, gmail, sheets, slides, apps_script
 from . import calendar as gcal_mod
 
 logger = logging.getLogger(__name__)
@@ -183,6 +183,22 @@ async def gdrive_create_folder(
 async def gdrive_move_file(file_id: str, new_parent_id: str) -> dict:
     """Move a file into a new parent folder. Removes all OTHER parents so the file ends up only under new_parent_id. No-op (data.moved=False) if the file is already only in new_parent_id."""
     return await drive.gdrive_move_file(file_id, new_parent_id)
+
+
+@mcp.tool()
+async def gdrive_copy_file(
+    file_id: str, new_title: Optional[str] = None, parent_id: Optional[str] = None
+) -> dict:
+    """Copy a Drive file (incl. Sheets/Docs + their bound Apps Script); returns the new file id. `new_title` names
+    the copy; `parent_id` places it in a folder. Use to make a safe sandbox/test copy before mutating production.
+    Caveat: a copied Sheet's IMPORTRANGE needs re-auth in the copy, and add-on configs still point at the originals."""
+    return await drive.gdrive_copy_file(file_id, new_title=new_title, parent_id=parent_id)
+
+
+@mcp.tool()
+async def gdrive_trash_file(file_id: str) -> dict:
+    """Move a file to Trash (recoverable ~30 days; NOT a permanent delete). Use to clean up sandbox/test copies you made. Confirm intent first."""
+    return await drive.gdrive_trash_file(file_id)
 
 
 # --- Comments Tools ---
@@ -504,9 +520,13 @@ async def sheets_list(spreadsheet_id: str) -> dict:
 
 
 @mcp.tool()
-async def sheets_read(spreadsheet_id: str, range: str) -> dict:
-    """Read cell values from an A1 range. `range` is a tab name ('Sheet1') or A1 range ('Sheet1!A1:E50')."""
-    return await sheets.sheets_read(spreadsheet_id, range)
+async def sheets_read(
+    spreadsheet_id: str, range: str, value_render_option: str = "FORMATTED_VALUE"
+) -> dict:
+    """Read cell values from an A1 range. `range` is a tab name ('Sheet1') or A1 range ('Sheet1!A1:E50').
+    `value_render_option`: FORMATTED_VALUE (default), UNFORMATTED_VALUE, or FORMULA (returns the cell's formula
+    like '=IF(K2<>"",K2,J2)' instead of its result — use to inspect/trace formulas)."""
+    return await sheets.sheets_read(spreadsheet_id, range, value_render_option=value_render_option)
 
 
 @mcp.tool()
@@ -523,6 +543,72 @@ async def sheets_append(
 ) -> dict:
     """Append a row to the end of a tab. `values` is one row (["Item A","2","ea"]) or a list of rows."""
     return await sheets.sheets_append(spreadsheet_id, sheet_name, values, value_input_option=value_input_option)
+
+
+@mcp.tool()
+async def sheets_add_tab(
+    spreadsheet_id: str, title: str, rows: int = 1000, columns: int = 26, index: int | None = None
+) -> dict:
+    """Create a new tab/sheet in a spreadsheet. `index` (optional) sets its 0-based position. Returns the new sheet_id."""
+    return await sheets.sheets_add_tab(spreadsheet_id, title, rows=rows, columns=columns, index=index)
+
+
+@mcp.tool()
+async def sheets_rename_tab(spreadsheet_id: str, title: str, new_title: str) -> dict:
+    """Rename a tab from `title` to `new_title`."""
+    return await sheets.sheets_rename_tab(spreadsheet_id, title, new_title)
+
+
+@mcp.tool()
+async def sheets_delete_tab(spreadsheet_id: str, title: str) -> dict:
+    """Delete a tab by name. DESTRUCTIVE — confirm intent before calling."""
+    return await sheets.sheets_delete_tab(spreadsheet_id, title)
+
+
+@mcp.tool()
+async def sheets_set_number_format(
+    spreadsheet_id: str, range: str, pattern: str = "@", format_type: str = "TEXT"
+) -> dict:
+    """Set a range's number format (range must name a tab, e.g. 'Sheet1!A2:A200'). Defaults force plain TEXT ('@')
+    so IDs / leading-zero codes / dates are stored verbatim. format_type: TEXT|NUMBER|PERCENT|CURRENCY|DATE|TIME|DATE_TIME|SCIENTIFIC."""
+    return await sheets.sheets_set_number_format(spreadsheet_id, range, pattern=pattern, format_type=format_type)
+
+
+# --- Apps Script Tools (read/edit/push .gs project source; run functions) ---
+
+@mcp.tool()
+async def apps_script_get_content(script_id: str) -> dict:
+    """Read every file in an Apps Script project (the .gs source + appsscript.json manifest + any HTML). `script_id`
+    is the project's Script ID (Apps Script editor -> Project Settings -> IDs; for a bound script, open it via the
+    container's Extensions -> Apps Script)."""
+    return await apps_script.apps_script_get_content(script_id)
+
+
+@mcp.tool()
+async def apps_script_update_file(
+    script_id: str, file_name: str, source: str, file_type: str = "SERVER_JS"
+) -> dict:
+    """Replace the source of ONE file in an Apps Script project, leaving the manifest and other files untouched
+    (fetches current content, swaps the named file, pushes the full set back). `file_name` has NO extension
+    ('Code', not 'Code.gs') — use the name from apps_script_get_content. `file_type` (new files only): SERVER_JS|HTML|JSON."""
+    return await apps_script.apps_script_update_file(script_id, file_name, source, file_type=file_type)
+
+
+@mcp.tool()
+async def apps_script_update_content(script_id: str, files: list) -> dict:
+    """Advanced: replace the ENTIRE project file set. `files` = list of {name, type, source}; MUST include the
+    manifest ({"name":"appsscript","type":"JSON","source":"{...}"}). Prefer apps_script_update_file for single edits."""
+    return await apps_script.apps_script_update_content(script_id, files)
+
+
+@mcp.tool()
+async def apps_script_run(
+    script_id: str, function_name: str, parameters: list | None = None, dev_mode: bool = True
+) -> dict:
+    """Run a function via scripts.run and return its result. REQUIRES the script deployed as an API Executable and
+    its GCP project == this OAuth client's project (often not possible for container-bound scripts without moving
+    them to a standard GCP project). Returns success=False with the structured error on a script-side failure."""
+    return await apps_script.apps_script_run(script_id, function_name, parameters=parameters, dev_mode=dev_mode)
 
 
 # --- Slides Tools (Phase 1: read + notes-safe find/replace) ---

@@ -3,9 +3,9 @@
 **English** · [Español](./README.es.md)
 
 Give a **local‑first AI assistant** safe, structured access to **your own** Google
-Workspace — Drive, Docs, Sheets, Slides, Gmail, and Calendar — using your own
-Google account, running entirely on your computer or server. Your credentials
-never leave your machine.
+Workspace — Drive, Docs, Sheets, Slides, Gmail, Calendar, and Apps Script — using
+your own Google account, running entirely on your computer or server. Your
+credentials never leave your machine.
 
 It's built to pair with **[crow](https://maestro.press/software/crow-overview/)** —
 a self‑hosted, [open‑source](https://github.com/kh0pper/crow) agentic framework and
@@ -29,16 +29,17 @@ so you're never locked in.
 
 ## What it can do
 
-**57 tools** across six Google services:
+**67 tools** across seven Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
 | **Docs** | Read, search, and safely edit Google Docs (incl. comments) | 14 |
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
-| **Drive** | Search, list, and organize files and folders | 6 |
+| **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; set cell formats | 8 |
+| **Drive** | Search, list, organize, **copy**, and trash files and folders | 8 |
 | **Calendar** | List/read/create events, respond to invites | 5 |
-| **Sheets** | Read, write, and append spreadsheet data | 4 |
+| **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
 
 **Safety is built in.** There is no "replace the whole document" tool (it has
 destroyed formatting in the past); edits are surgical. The only tool that
@@ -118,9 +119,10 @@ protected data), and share this page with IT to discuss a path forward.
 > 2. Mark my OAuth client ID **Trusted** under *Admin console → Security → API
 >    controls → App access control* so it can use these Google APIs.
 >
-> It needs these APIs enabled: **Drive, Docs, Sheets, Slides, Gmail, Calendar**,
-> with scopes for reading/editing my own Drive/Docs/Sheets/Slides, composing and
-> managing my Gmail, and managing my Calendar.
+> It needs these APIs enabled: **Drive, Docs, Sheets, Slides, Gmail, Calendar,
+> Apps Script**, with scopes for reading/editing my own Drive/Docs/Sheets/Slides,
+> composing and managing my Gmail, managing my Calendar, and managing my own Apps
+> Script projects.
 >
 > Thank you!
 
@@ -135,14 +137,19 @@ Do this in your browser, signed in as the account you'll use.
 2. **Enable the APIs.** Using the search bar at the top, find and **Enable** each
    of these (a few seconds each):
    **Google Drive API**, **Google Docs API**, **Google Sheets API**,
-   **Google Slides API**, **Gmail API**, **Google Calendar API**.
-3. **Configure the OAuth consent screen** (left menu → *APIs & Services → OAuth
+   **Google Slides API**, **Gmail API**, **Google Calendar API**,
+   **Apps Script API**.
+3. **Turn on the Apps Script API for your user** (only needed for the Apps Script
+   tools). Visit [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
+   and switch **Google Apps Script API** to **On**. (This is a one‑time per‑user
+   toggle, separate from enabling the API in the project above.)
+4. **Configure the OAuth consent screen** (left menu → *APIs & Services → OAuth
    consent screen*, or *Google Auth Platform*).
    - **User type:** choose **Internal** if it's offered (best — non‑expiring,
      no warnings). If only **External** is available, pick it and add your own
      email as a **Test user**.
    - Fill in an app name and your email where asked.
-4. **Create the credentials** (left menu → *Credentials* → *Create credentials*
+5. **Create the credentials** (left menu → *Credentials* → *Create credentials*
    → *OAuth client ID*).
    - **Application type:** **Desktop app**. (This is important — it's what lets
      the local sign‑in work. Do **not** pick "Web application".)
@@ -270,7 +277,7 @@ protected data.
 
 ---
 
-## Tool reference (57 tools)
+## Tool reference (67 tools)
 
 - **Docs (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -283,11 +290,18 @@ protected data.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (6):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
-  `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`.
+- **Drive (8):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+  `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`,
+  `gdrive_copy_file`, `gdrive_trash_file`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Sheets (4):** `sheets_list`, `sheets_read`, `sheets_write`, `sheets_append`.
+- **Sheets (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+  `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
+  `sheets_delete_tab`, `sheets_set_number_format`.
+- **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,
+  `apps_script_update_content`, `apps_script_run`. Requires the Apps Script API
+  enabled + the per‑user toggle at script.google.com/home/usersettings;
+  `apps_script_run` also needs an API‑Executable deployment.
 
 ---
 

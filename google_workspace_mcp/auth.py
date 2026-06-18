@@ -32,6 +32,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/calendar.events",
+    # Apps Script API: read/edit/push project .gs source (projects.getContent /
+    # updateContent) and scripts.run. Requires the Apps Script API enabled in the
+    # OAuth client's GCP project AND the user's Apps Script API setting
+    # (script.google.com/home/usersettings) turned on.
+    "https://www.googleapis.com/auth/script.projects",
 ]
 
 # Default credential paths, overridable via env vars:
@@ -178,6 +183,7 @@ _gmail_service = None
 _sheets_service = None
 _calendar_service = None
 _slides_service = None
+_script_service = None
 
 _NOT_AUTHED_HINT = (
     "Not authenticated. Run `google-workspace-mcp-authorize` to sign in "
@@ -258,10 +264,21 @@ def get_calendar_service():
     return _calendar_service
 
 
+def get_script_service():
+    """Get or create Apps Script API v1 service."""
+    global _script_service
+    if _script_service is None:
+        auth = get_auth()
+        if not auth.is_authenticated():
+            raise RuntimeError(_NOT_AUTHED_HINT)
+        _script_service = build("script", "v1", credentials=auth.credentials)
+    return _script_service
+
+
 def refresh_services():
     """Force re-creation of services (after token refresh on 401)."""
     global _drive_service, _docs_service, _gmail_service, _sheets_service
-    global _calendar_service, _slides_service
+    global _calendar_service, _slides_service, _script_service
     auth = get_auth()
     if auth._credentials and auth._credentials.expired and auth._credentials.refresh_token:
         auth._credentials.refresh(Request())
@@ -272,3 +289,4 @@ def refresh_services():
     _sheets_service = None
     _calendar_service = None
     _slides_service = None
+    _script_service = None

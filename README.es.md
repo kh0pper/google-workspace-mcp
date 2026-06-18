@@ -3,9 +3,9 @@
 [English](./README.md) · **Español**
 
 Brinda a un **asistente de IA local** acceso seguro y estructurado a **tu propio**
-Google Workspace — Drive, Documentos, Hojas de cálculo, Presentaciones, Gmail y
-Calendar — usando tu propia cuenta de Google, ejecutándose por completo en tu
-computadora o servidor. Tus credenciales nunca salen de tu equipo.
+Google Workspace — Drive, Documentos, Hojas de cálculo, Presentaciones, Gmail,
+Calendar y Apps Script — usando tu propia cuenta de Google, ejecutándose por
+completo en tu computadora o servidor. Tus credenciales nunca salen de tu equipo.
 
 Está pensado para combinarse con **[crow](https://maestro.press/software/crow-overview/)** —
 un marco agéntico y plataforma MCP autoalojado y de
@@ -30,16 +30,17 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**57 herramientas** en seis servicios de Google:
+**67 herramientas** en siete servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
 | **Documentos** | Leer, buscar y editar de forma segura Google Docs (incl. comentarios) | 14 |
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
-| **Drive** | Buscar, listar y organizar archivos y carpetas | 6 |
+| **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; dar formato a celdas | 8 |
+| **Drive** | Buscar, listar, organizar, **copiar** y enviar a la papelera archivos y carpetas | 8 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
-| **Hojas de cálculo** | Leer, escribir y agregar datos de hojas de cálculo | 4 |
+| **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
 
 **La seguridad viene integrada.** No existe una herramienta para "reemplazar todo
 el documento" (en el pasado ha destruido el formato); las ediciones son
@@ -127,9 +128,9 @@ datos protegidos) y compartir esta página con TI para discutir un camino a segu
 >    a apps* para que pueda usar estas APIs de Google.
 >
 > Necesita estas APIs habilitadas: **Drive, Documentos, Hojas de cálculo,
-> Presentaciones, Gmail, Calendar**, con permisos para leer/editar mi propio
-> Drive/Docs/Sheets/Slides, redactar y administrar mi Gmail, y administrar mi
-> Calendar.
+> Presentaciones, Gmail, Calendar, Apps Script**, con permisos para leer/editar mi
+> propio Drive/Docs/Sheets/Slides, redactar y administrar mi Gmail, administrar mi
+> Calendar y administrar mis propios proyectos de Apps Script.
 >
 > ¡Gracias!
 
@@ -144,15 +145,21 @@ Haz esto en tu navegador, con la sesión iniciada en la cuenta que usarás.
 2. **Habilita las APIs.** Con la barra de búsqueda de arriba, busca y **Habilita**
    cada una de estas (unos segundos cada una):
    **Google Drive API**, **Google Docs API**, **Google Sheets API**,
-   **Google Slides API**, **Gmail API**, **Google Calendar API**.
-3. **Configura la pantalla de consentimiento de OAuth** (menú izquierdo →
+   **Google Slides API**, **Gmail API**, **Google Calendar API**,
+   **Apps Script API**.
+3. **Activa la API de Apps Script para tu usuario** (solo necesario para las
+   herramientas de Apps Script). Visita
+   [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
+   y pon **Google Apps Script API** en **Activado** (*On*). (Es un interruptor por
+   usuario, separado de habilitar la API en el proyecto, y se hace una sola vez.)
+4. **Configura la pantalla de consentimiento de OAuth** (menú izquierdo →
    *APIs y servicios → Pantalla de consentimiento de OAuth*, o
    *Plataforma de Google Auth*).
    - **Tipo de usuario:** elige **Interno** (*Internal*) si está disponible (lo
      mejor: no expira, sin advertencias). Si solo hay **Externo** (*External*),
      elígelo y agrega tu propio correo como **usuario de prueba** (*Test user*).
    - Completa el nombre de la app y tu correo donde se pida.
-4. **Crea las credenciales** (menú izquierdo → *Credenciales* → *Crear
+5. **Crea las credenciales** (menú izquierdo → *Credenciales* → *Crear
    credenciales* → *ID de cliente de OAuth*).
    - **Tipo de aplicación:** **Desktop app** (aplicación de escritorio). (Esto es
      importante: es lo que hace funcionar el inicio de sesión local. **No** elijas
@@ -285,7 +292,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (57 herramientas)
+## Referencia de herramientas (67 herramientas)
 
 - **Documentos (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -299,11 +306,18 @@ usar esto con datos protegidos.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (6):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
-  `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`.
+- **Drive (8):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+  `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`,
+  `gdrive_copy_file`, `gdrive_trash_file`.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Hojas de cálculo (4):** `sheets_list`, `sheets_read`, `sheets_write`, `sheets_append`.
+- **Hojas de cálculo (8):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+  `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
+  `sheets_delete_tab`, `sheets_set_number_format`.
+- **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,
+  `apps_script_update_content`, `apps_script_run`. Requiere la API de Apps Script
+  habilitada + el interruptor por usuario en script.google.com/home/usersettings;
+  `apps_script_run` además necesita una implementación tipo «API ejecutable».
 
 ---
 

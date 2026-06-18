@@ -253,3 +253,60 @@ async def gdrive_move_file(file_id: str, new_parent_id: str) -> dict:
             "moved": True,
         },
     }
+
+
+@handle_google_errors
+async def gdrive_copy_file(
+    file_id: str, new_title: Optional[str] = None, parent_id: Optional[str] = None
+) -> dict:
+    """Copy a Drive file (incl. Google Sheets/Docs and their bound Apps Script)
+    and return the new file's id. `new_title` (optional) names the copy;
+    `parent_id` (optional) places it in a folder, else it lands in My Drive root.
+
+    Use this to make a safe sandbox/test copy before mutating a production file.
+    Caveat: a copied Sheet keeps its IMPORTRANGE formulas but they need
+    re-authorization in the copy, and any add-on configs still point at the
+    originals until repointed — fine for a read/logic test copy.
+    """
+    drive = get_drive_service()
+    body: dict = {}
+    if new_title:
+        body["name"] = new_title
+    if parent_id:
+        body["parents"] = [parent_id]
+    result = await asyncio.to_thread(
+        lambda: drive.files().copy(
+            fileId=file_id, body=body, fields="id, name, parents, mimeType"
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": result["id"],
+            "name": result.get("name"),
+            "parents": result.get("parents", []),
+            "mime_type": result.get("mimeType"),
+            "source_file_id": file_id,
+        },
+    }
+
+
+@handle_google_errors
+async def gdrive_trash_file(file_id: str) -> dict:
+    """Move a file to the Trash (recoverable for ~30 days; NOT a permanent
+    delete). Use to clean up sandbox/test copies you created. Confirm intent
+    before calling — this hides the file from normal views."""
+    drive = get_drive_service()
+    result = await asyncio.to_thread(
+        lambda: drive.files().update(
+            fileId=file_id, body={"trashed": True}, fields="id, name, trashed"
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "id": result["id"],
+            "name": result.get("name"),
+            "trashed": result.get("trashed", True),
+        },
+    }
