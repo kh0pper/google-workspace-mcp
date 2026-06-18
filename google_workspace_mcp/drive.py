@@ -17,19 +17,29 @@ MIME_GDOC = "application/vnd.google-apps.document"
 
 @handle_google_errors
 async def gdrive_list_folder(folder_id: str) -> dict:
-    """List files in a Google Drive folder by ID."""
+    """List ALL files in a Google Drive folder by ID. Paginates through every
+    page (pageSize 1000 + pageToken loop), so the result is NOT capped at 100 —
+    use for a complete folder inventory."""
     drive = get_drive_service()
 
-    result = await asyncio.to_thread(
-        lambda: drive.files().list(
-            q=f"'{folder_id}' in parents and trashed = false",
-            spaces="drive",
-            fields="files(id, name, mimeType, modifiedTime, size)",
-            orderBy="name",
-        ).execute()
-    )
+    files = []
+    page_token = None
+    while True:
+        result = await asyncio.to_thread(
+            lambda token=page_token: drive.files().list(
+                q=f"'{folder_id}' in parents and trashed = false",
+                spaces="drive",
+                fields="nextPageToken, files(id, name, mimeType, modifiedTime, size)",
+                orderBy="name",
+                pageSize=1000,
+                pageToken=token,
+            ).execute()
+        )
+        files.extend(result.get("files", []))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
 
-    files = result.get("files", [])
     return {
         "success": True,
         "data": {
