@@ -4,8 +4,9 @@
 
 Brinda a un **asistente de IA local** acceso seguro y estructurado a **tu propio**
 Google Workspace — Drive, Documentos, Hojas de cálculo, Presentaciones, Gmail,
-Calendar y Apps Script — usando tu propia cuenta de Google, ejecutándose por
-completo en tu computadora o servidor. Tus credenciales nunca salen de tu equipo.
+Calendar, Apps Script y Formularios — usando tu propia cuenta de Google,
+ejecutándose por completo en tu computadora o servidor. Tus credenciales nunca
+salen de tu equipo.
 
 Está pensado para combinarse con **[crow](https://maestro.press/software/crow-overview/)** —
 un marco agéntico y plataforma MCP autoalojado y de
@@ -30,7 +31,7 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**72 herramientas** en siete servicios de Google:
+**75 herramientas** en ocho servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
@@ -41,6 +42,7 @@ así que nunca quedas atado a una sola IA.
 | **Drive** | Buscar, listar, organizar, **copiar**, renombrar, enviar a la papelera, transferir propiedad y crear accesos directos a archivos y carpetas | 11 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
 | **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
+| **Formularios** | Leer la estructura de un formulario; agregar/editar preguntas **sin recrearlo** (conserva la URL publicada) | 3 |
 
 **La seguridad viene integrada.** No existe una herramienta para "reemplazar todo
 el documento" (en el pasado ha destruido el formato); las ediciones son
@@ -128,9 +130,10 @@ datos protegidos) y compartir esta página con TI para discutir un camino a segu
 >    a apps* para que pueda usar estas APIs de Google.
 >
 > Necesita estas APIs habilitadas: **Drive, Documentos, Hojas de cálculo,
-> Presentaciones, Gmail, Calendar, Apps Script**, con permisos para leer/editar mi
-> propio Drive/Docs/Sheets/Slides, redactar y administrar mi Gmail, administrar mi
-> Calendar y administrar mis propios proyectos de Apps Script.
+> Presentaciones, Gmail, Calendar, Apps Script, Formularios**, con permisos para
+> leer/editar mi propio Drive/Docs/Sheets/Slides, redactar y administrar mi Gmail,
+> administrar mi Calendar, administrar mis propios proyectos de Apps Script y editar
+> mis propios Formularios.
 >
 > ¡Gracias!
 
@@ -146,7 +149,7 @@ Haz esto en tu navegador, con la sesión iniciada en la cuenta que usarás.
    cada una de estas (unos segundos cada una):
    **Google Drive API**, **Google Docs API**, **Google Sheets API**,
    **Google Slides API**, **Gmail API**, **Google Calendar API**,
-   **Apps Script API**.
+   **Apps Script API**, **Google Forms API**.
 3. **Activa la API de Apps Script para tu usuario** (solo necesario para las
    herramientas de Apps Script). Visita
    [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
@@ -292,7 +295,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (72 herramientas)
+## Referencia de herramientas (75 herramientas)
 
 - **Documentos (14):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_at_heading`,
@@ -319,6 +322,11 @@ usar esto con datos protegidos.
   `apps_script_update_content`, `apps_script_run`. Requiere la API de Apps Script
   habilitada + el interruptor por usuario en script.google.com/home/usersettings;
   `apps_script_run` además necesita una implementación tipo «API ejecutable».
+- **Formularios (3):** `forms_get_structure`, `forms_add_question`,
+  `forms_batch_update`. Edita un formulario **sin recrearlo** (createItem /
+  updateItem / deleteItem), por lo que se conserva la URL de respuesta publicada
+  (códigos QR, volantes, correos anteriores). Lee solo la estructura, **no las
+  respuestas**. Requiere la API de Google Forms habilitada.
 
 ---
 

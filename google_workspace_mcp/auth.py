@@ -37,6 +37,11 @@ SCOPES = [
     # OAuth client's GCP project AND the user's Apps Script API setting
     # (script.google.com/home/usersettings) turned on.
     "https://www.googleapis.com/auth/script.projects",
+    # Google Forms API: read a form's structure and EDIT it in place (add/edit/
+    # delete questions) without recreating it (preserves the published URL).
+    # Requires the Forms API enabled in the OAuth client's GCP project. This is
+    # forms.body (structure) only — NOT forms.responses.
+    "https://www.googleapis.com/auth/forms.body",
 ]
 
 # Default credential paths, overridable via env vars:
@@ -184,6 +189,7 @@ _sheets_service = None
 _calendar_service = None
 _slides_service = None
 _script_service = None
+_forms_service = None
 
 _NOT_AUTHED_HINT = (
     "Not authenticated. Run `google-workspace-mcp-authorize` to sign in "
@@ -275,10 +281,21 @@ def get_script_service():
     return _script_service
 
 
+def get_forms_service():
+    """Get or create Google Forms API v1 service."""
+    global _forms_service
+    if _forms_service is None:
+        auth = get_auth()
+        if not auth.is_authenticated():
+            raise RuntimeError(_NOT_AUTHED_HINT)
+        _forms_service = build("forms", "v1", credentials=auth.credentials)
+    return _forms_service
+
+
 def refresh_services():
     """Force re-creation of services (after token refresh on 401)."""
     global _drive_service, _docs_service, _gmail_service, _sheets_service
-    global _calendar_service, _slides_service, _script_service
+    global _calendar_service, _slides_service, _script_service, _forms_service
     auth = get_auth()
     if auth._credentials and auth._credentials.expired and auth._credentials.refresh_token:
         auth._credentials.refresh(Request())
@@ -290,3 +307,4 @@ def refresh_services():
     _calendar_service = None
     _slides_service = None
     _script_service = None
+    _forms_service = None

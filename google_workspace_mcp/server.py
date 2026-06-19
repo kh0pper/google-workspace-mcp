@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
-from . import docs, drive, comments, gmail, sheets, slides, apps_script
+from . import docs, drive, comments, gmail, sheets, slides, apps_script, forms
 from . import calendar as gcal_mod
 
 logger = logging.getLogger(__name__)
@@ -639,6 +639,40 @@ async def apps_script_run(
     its GCP project == this OAuth client's project (often not possible for container-bound scripts without moving
     them to a standard GCP project). Returns success=False with the structured error on a script-side failure."""
     return await apps_script.apps_script_run(script_id, function_name, parameters=parameters, dev_mode=dev_mode)
+
+
+# --- Google Forms Tools (read structure; edit questions IN PLACE, URL preserved) ---
+
+@mcp.tool()
+async def forms_get_structure(form_id: str) -> dict:
+    """Read a Google Form's structure: title, the public responder URL, the linked response sheet, and every item
+    (item_id, title, kind; for choice questions: choice_type RADIO|CHECKBOX|DROP_DOWN + options + required). Read this
+    first to get item ids / indexes before editing. Does NOT read responses."""
+    return await forms.forms_get_structure(form_id)
+
+
+@mcp.tool()
+async def forms_add_question(
+    form_id: str,
+    title: str,
+    type: str = "CHECKBOX",
+    options: Optional[list] = None,
+    required: bool = False,
+    index: Optional[int] = None,
+) -> dict:
+    """Add ONE question to an existing Google Form IN PLACE (preserves the published URL — never recreates the form).
+    `type`: CHECKBOX|RADIO|DROP_DOWN (need `options`) or SHORT_TEXT|PARAGRAPH. `index`: 0-based position (None = append).
+    Returns the new item id."""
+    return await forms.forms_add_question(
+        form_id, title, type=type, options=options, required=required, index=index
+    )
+
+
+@mcp.tool()
+async def forms_batch_update(form_id: str, requests: list) -> dict:
+    """Advanced: raw forms.batchUpdate passthrough (createItem / updateItem / deleteItem / moveItem / updateFormInfo /
+    updateSettings). Editing by form id preserves the published URL. Returns the new revisionId + replies."""
+    return await forms.forms_batch_update(form_id, requests)
 
 
 # --- Slides Tools (Phase 1: read + notes-safe find/replace) ---
