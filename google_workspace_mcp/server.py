@@ -187,6 +187,12 @@ async def gdrive_get_metadata(file_id: str) -> dict:
 
 
 @mcp.tool()
+async def gdrive_get_permissions(file_id: str) -> dict:
+    """List every sharing permission on a Drive file/folder (READ-ONLY — does not change sharing). Returns each permission's type/role/email/domain plus an `anyone_with_link` flag (True if a type='anyone' permission exists) for sharing audits."""
+    return await drive.gdrive_get_permissions(file_id)
+
+
+@mcp.tool()
 async def gdrive_search(query: str, max_results: int = 20) -> dict:
     """Search Google Drive by name pattern."""
     return await drive.gdrive_search(query, max_results)

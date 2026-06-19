@@ -126,6 +126,59 @@ async def gdrive_get_metadata(file_id: str) -> dict:
 
 
 @handle_google_errors
+async def gdrive_get_permissions(file_id: str) -> dict:
+    """List every sharing permission on a Drive file/folder (who can see it). READ-ONLY —
+    does not change sharing. Returns each permission's type/role/email/domain plus a
+    convenience `anyone_with_link` flag (True if a type='anyone' permission exists) for
+    sharing audits. Paginates fully (no cap)."""
+    drive = get_drive_service()
+
+    permissions = []
+    page_token = None
+    while True:
+        result = await asyncio.to_thread(
+            lambda token=page_token: drive.permissions().list(
+                fileId=file_id,
+                fields="nextPageToken, permissions(id, type, role, emailAddress, domain, displayName, allowFileDiscovery, deleted)",
+                pageSize=100,
+                supportsAllDrives=True,
+                pageToken=token,
+            ).execute()
+        )
+        permissions.extend(result.get("permissions", []))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+
+    cleaned = [
+        {
+            "id": p.get("id"),
+            "type": p.get("type"),
+            "role": p.get("role"),
+            "email": p.get("emailAddress"),
+            "domain": p.get("domain"),
+            "display_name": p.get("displayName"),
+            # For type='anyone'/'domain': False = link-only, True = discoverable/searchable.
+            "allow_file_discovery": p.get("allowFileDiscovery"),
+            "deleted": p.get("deleted", False),
+        }
+        for p in permissions
+    ]
+    anyone = [p for p in cleaned if p["type"] == "anyone"]
+
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "count": len(cleaned),
+            # True means anyone-with-the-link can open it.
+            "anyone_with_link": bool(anyone),
+            "permissions": cleaned,
+        },
+    }
+
+
+@handle_google_errors
 async def gdrive_search(query: str, max_results: int = 20) -> dict:
     """Search Drive by name pattern. Searches non-trashed files."""
     drive = get_drive_service()

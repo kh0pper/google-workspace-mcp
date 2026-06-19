@@ -31,7 +31,7 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**76 herramientas** en ocho servicios de Google:
+**77 herramientas** en ocho servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
@@ -39,7 +39,7 @@ así que nunca quedas atado a una sola IA.
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
 | **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; formato numérico y visual (colores/bordes/anchos/inmovilizar) | 10 |
-| **Drive** | Buscar, listar, organizar, **copiar**, renombrar, enviar a la papelera, transferir propiedad y crear accesos directos a archivos y carpetas | 11 |
+| **Drive** | Buscar, listar, organizar, **copiar**, renombrar, enviar a la papelera, transferir propiedad, crear accesos directos y leer los permisos de uso compartido de archivos y carpetas | 12 |
 | **Calendar** | Listar/leer/crear eventos, responder invitaciones | 5 |
 | **Apps Script** | Leer, editar y subir el código de un proyecto de Apps Script; ejecutar funciones | 4 |
 | **Formularios** | Leer la estructura de un formulario; agregar/editar preguntas **sin recrearlo** (conserva la URL publicada) | 3 |
@@ -295,7 +295,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (76 herramientas)
+## Referencia de herramientas (77 herramientas)
 
 - **Documentos (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
@@ -311,10 +311,11 @@ usar esto con datos protegidos.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (11):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
-  `gdrive_get_metadata`, `gdrive_create_folder`, `gdrive_move_file`,
+- **Drive (12):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+  `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_create_folder`, `gdrive_move_file`,
   `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`, `gdrive_transfer_ownership`,
-  `gdrive_create_shortcut`.
+  `gdrive_create_shortcut`. `gdrive_get_permissions` lee la lista de uso compartido de un
+  archivo (solo lectura) y señala el acceso «cualquiera con el enlace».
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
 - **Hojas de cálculo (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
