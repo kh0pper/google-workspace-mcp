@@ -80,6 +80,27 @@ async def gdocs_append(doc_id: str, markdown: str) -> dict:
 
 
 @mcp.tool()
+async def gdocs_insert_image(
+    doc_id: str,
+    image: str,
+    anchor_text: Optional[str] = None,
+    index: Optional[int] = None,
+    max_width_pt: float = 450.0,
+    keep_drive_copy: bool = False,
+) -> dict:
+    """Insert an inline image into a Google Doc. `image` = a LOCAL file path (uploaded to Drive automatically)
+    or an existing Drive file id. With `anchor_text`, the image REPLACES the first occurrence of that text (e.g. a
+    placeholder token); otherwise it inserts at `index` (default: doc start). PNG/GIF size auto-scales to
+    max_width_pt (aspect preserved). Mechanism: the image is briefly shared anyone-with-link so the Docs API can
+    fetch it, then un-shared + (unless keep_drive_copy) trashed — the doc keeps its own embedded copy. The brief
+    public window means: do NOT use for images containing sensitive/regulated data (FERPA/HIPAA)."""
+    return await docs.gdocs_insert_image(
+        doc_id, image, anchor_text=anchor_text, index=index,
+        max_width_pt=max_width_pt, keep_drive_copy=keep_drive_copy,
+    )
+
+
+@mcp.tool()
 async def gdocs_insert_at_heading(doc_id: str, heading: str, markdown: str) -> dict:
     """
     Insert formatted markdown content after a specific heading.

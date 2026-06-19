@@ -7,13 +7,49 @@ No full-document replace tool exists (deliberate guardrail).
 
 import asyncio
 import logging
+import os
+import struct
 from typing import Optional
+
+from googleapiclient.http import MediaFileUpload
 
 from .auth import get_docs_service, get_drive_service
 from .docs_formatting import docs_structure_to_markdown, markdown_to_docs_requests
 from .guardrails import handle_google_errors, build_heading_inheritance_fix
 
 logger = logging.getLogger(__name__)
+
+
+def _find_anchor_index(doc: dict, anchor: str):
+    """Return the start index of the first occurrence of `anchor` text within a
+    single text run, or None. (Short tokens/placeholders live in one run.)"""
+    for element in doc.get("body", {}).get("content", []):
+        para = element.get("paragraph")
+        if not para:
+            continue
+        for el in para.get("elements", []):
+            tr = el.get("textRun")
+            if not tr:
+                continue
+            content = tr.get("content", "")
+            pos = content.find(anchor)
+            if pos >= 0:
+                return el.get("startIndex", 0) + pos
+    return None
+
+
+def _png_size_px(path: str):
+    """(width, height) in px for a PNG/GIF, or None if not determinable."""
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(26)
+        if head[:8] == b"\x89PNG\r\n\x1a\n":
+            return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+        if head[:6] in (b"GIF87a", b"GIF89a"):
+            return struct.unpack("<HH", head[6:10])
+    except Exception:
+        pass
+    return None
 
 
 def _get_doc_structure(doc_id: str) -> dict:
@@ -641,3 +677,126 @@ async def gdocs_rewrite_passages(
             "results": clean_results,
         },
     }
+
+
+@handle_google_errors
+async def gdocs_insert_image(
+    doc_id: str,
+    image: str,
+    anchor_text: Optional[str] = None,
+    index: Optional[int] = None,
+    max_width_pt: float = 450.0,
+    keep_drive_copy: bool = False,
+) -> dict:
+    """Insert an inline image into a Google Doc.
+
+    `image`: a LOCAL file path (uploaded to Drive automatically) OR an existing
+    Drive file id. `anchor_text`: if given, the image replaces the first occurrence
+    of that text (e.g. a `{{IMG:…}}` token or a "[Screenshot placeholder: …]"
+    line); otherwise the image is inserted at `index` (or at the document start).
+    PNG/GIF dimensions are auto-scaled to `max_width_pt` (preserving aspect ratio).
+
+    HOW IT WORKS: the Docs API fetches the image from a URL once at insert time and
+    stores its own copy in the document. A local image is therefore uploaded to
+    Drive, shared anyone-with-link **briefly**, inserted, then un-shared and (unless
+    keep_drive_copy) trashed — the embedded copy in the doc is self-contained. The
+    brief public window means: do NOT use this for images containing sensitive or
+    regulated data (e.g. records covered by FERPA/HIPAA)."""
+    docs = get_docs_service()
+    drive = get_drive_service()
+
+    # 1. resolve `image` -> a Drive file id (upload if it's a local path)
+    temp_id = None
+    is_local = os.path.exists(image)
+    if is_local:
+        media = MediaFileUpload(image, resumable=False)
+        up = await asyncio.to_thread(
+            lambda: drive.files().create(
+                body={"name": os.path.basename(image)}, media_body=media, fields="id"
+            ).execute()
+        )
+        file_id = up["id"]
+        temp_id = file_id
+    else:
+        file_id = image  # assume it is already a Drive file id
+
+    perm_id = None
+    try:
+        # 2. share anyone-with-link reader so the Docs API can fetch it
+        perm = await asyncio.to_thread(
+            lambda: drive.permissions().create(
+                fileId=file_id, body={"type": "anyone", "role": "reader"}, fields="id"
+            ).execute()
+        )
+        perm_id = perm["id"]
+
+        # 3. compute object size from the image header (cap to max_width_pt)
+        size_req = {}
+        if is_local:
+            wh = _png_size_px(image)
+            if wh and wh[0] and wh[1]:
+                w_px, h_px = wh
+                width_pt = min(float(max_width_pt), w_px * 72.0 / 96.0)
+                size_req = {"objectSize": {
+                    "width": {"magnitude": width_pt, "unit": "PT"},
+                    "height": {"magnitude": width_pt * h_px / w_px, "unit": "PT"},
+                }}
+
+        # 4. resolve the insertion index
+        if anchor_text:
+            doc = await asyncio.to_thread(
+                lambda: docs.documents().get(documentId=doc_id).execute()
+            )
+            start = _find_anchor_index(doc, anchor_text)
+            if start is None:
+                return {"success": False,
+                        "error": f"anchor_text not found in doc: {anchor_text!r}",
+                        "data": {"doc_id": doc_id}}
+            requests = [
+                {"deleteContentRange": {"range": {
+                    "startIndex": start, "endIndex": start + len(anchor_text)}}},
+            ]
+        else:
+            start = 1 if index is None else int(index)
+            requests = []
+        img_req = {"location": {"index": start},
+                   "uri": f"https://drive.google.com/uc?export=view&id={file_id}"}
+        img_req.update(size_req)
+        requests.append({"insertInlineImage": img_req})
+
+        # 5. apply (delete-anchor + insert-image are sequential in one batchUpdate)
+        await asyncio.to_thread(
+            lambda: docs.documents().batchUpdate(
+                documentId=doc_id, body={"requests": requests}
+            ).execute()
+        )
+    finally:
+        # 6. always revoke the public permission we added
+        if perm_id:
+            try:
+                await asyncio.to_thread(
+                    lambda: drive.permissions().delete(
+                        fileId=file_id, permissionId=perm_id).execute()
+                )
+            except Exception as e:
+                logger.warning("could not revoke public permission on %s: %s", file_id, e)
+
+    # 7. trash the temp upload (the doc holds its own copy now)
+    trashed = False
+    if temp_id and not keep_drive_copy:
+        try:
+            await asyncio.to_thread(
+                lambda: drive.files().update(fileId=temp_id, body={"trashed": True}).execute()
+            )
+            trashed = True
+        except Exception as e:
+            logger.warning("could not trash temp upload %s: %s", temp_id, e)
+
+    return {"success": True, "data": {
+        "doc_id": doc_id,
+        "inserted_at_index": start,
+        "replaced_anchor": anchor_text,
+        "image_drive_id": file_id,
+        "temp_upload_trashed": trashed,
+        "kept_drive_copy": bool(keep_drive_copy and temp_id),
+    }}
