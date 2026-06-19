@@ -193,6 +193,12 @@ async def gdrive_get_permissions(file_id: str) -> dict:
 
 
 @mcp.tool()
+async def gdrive_read_file(file_id: str, export_mime_type: str | None = None, max_chars: int = 200000) -> dict:
+    """Read a Drive file's raw content as text (READ-ONLY). For uploaded files (CSV/TSV/TXT/JSON) downloads the bytes and returns UTF-8 text; binary files return base64. For Google-native files pass export_mime_type (e.g. 'text/csv') — but prefer the gdocs_/sheets_ tools for those. Capped at max_chars."""
+    return await drive.gdrive_read_file(file_id, export_mime_type=export_mime_type, max_chars=max_chars)
+
+
+@mcp.tool()
 async def gdrive_search(query: str, max_results: int = 20) -> dict:
     """Search Google Drive by name pattern."""
     return await drive.gdrive_search(query, max_results)

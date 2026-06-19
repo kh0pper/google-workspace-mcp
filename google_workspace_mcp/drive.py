@@ -3,6 +3,7 @@ Google Drive API tools — folder listing, search, metadata.
 """
 
 import asyncio
+import base64
 import logging
 from typing import Optional
 
@@ -176,6 +177,64 @@ async def gdrive_get_permissions(file_id: str) -> dict:
             "permissions": cleaned,
         },
     }
+
+
+@handle_google_errors
+async def gdrive_read_file(
+    file_id: str, export_mime_type: Optional[str] = None, max_chars: int = 200000
+) -> dict:
+    """Read a Drive file's raw content as text (READ-ONLY). For UPLOADED files (CSV/TSV/TXT/JSON
+    and similar) it downloads the bytes (files.get_media) and returns UTF-8 text. For binary files
+    it returns base64 (encoding='base64'). For Google-native files (Docs/Sheets/Slides) you must
+    pass export_mime_type (e.g. 'text/csv', 'text/plain') — but prefer the dedicated gdocs_/sheets_
+    tools for those. Content is capped at max_chars (truncated=True if cut)."""
+    drive = get_drive_service()
+    meta = await asyncio.to_thread(
+        lambda: drive.files().get(
+            fileId=file_id, fields="id, name, mimeType, size", supportsAllDrives=True
+        ).execute()
+    )
+    mime = meta.get("mimeType", "")
+    name = meta.get("name")
+
+    if mime.startswith("application/vnd.google-apps"):
+        export_mt = export_mime_type or "text/plain"
+        raw = await asyncio.to_thread(
+            lambda: drive.files().export(fileId=file_id, mimeType=export_mt).execute()
+        )
+    else:
+        raw = await asyncio.to_thread(
+            lambda: drive.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
+        )
+
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8")
+    try:
+        text = raw.decode("utf-8")
+        return {
+            "success": True,
+            "data": {
+                "file_id": file_id,
+                "name": name,
+                "mime_type": mime,
+                "encoding": "text",
+                "truncated": len(text) > max_chars,
+                "content": text[:max_chars],
+            },
+        }
+    except UnicodeDecodeError:
+        b64 = base64.b64encode(raw).decode("ascii")
+        return {
+            "success": True,
+            "data": {
+                "file_id": file_id,
+                "name": name,
+                "mime_type": mime,
+                "encoding": "base64",
+                "truncated": len(b64) > max_chars,
+                "content": b64[:max_chars],
+            },
+        }
 
 
 @handle_google_errors

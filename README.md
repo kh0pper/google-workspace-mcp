@@ -29,7 +29,7 @@ so you're never locked in.
 
 ## What it can do
 
-**77 tools** across eight Google services:
+**78 tools** across eight Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
@@ -37,7 +37,7 @@ so you're never locked in.
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
 | **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; number + visual formatting (colors/borders/widths/freeze) | 10 |
-| **Drive** | Search, list, organize, **copy**, rename, trash, transfer ownership, shortcut, and read sharing permissions of files and folders | 12 |
+| **Drive** | Search, list, organize, **copy**, rename, trash, transfer ownership, shortcut, read sharing permissions, and read raw file content of files and folders | 13 |
 | **Calendar** | List/read/create events, respond to invites | 5 |
 | **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
 | **Forms** | Read a form's structure; add/edit questions **in place** (keeps the published URL) | 3 |
@@ -278,7 +278,7 @@ protected data.
 
 ---
 
-## Tool reference (77 tools)
+## Tool reference (78 tools)
 
 - **Docs (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
@@ -292,11 +292,12 @@ protected data.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (12):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
-  `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_create_folder`, `gdrive_move_file`,
-  `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`, `gdrive_transfer_ownership`,
-  `gdrive_create_shortcut`. `gdrive_get_permissions` reads a file's sharing list
-  (read‑only) and flags anyone‑with‑link access.
+- **Drive (13):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+  `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_read_file`, `gdrive_create_folder`,
+  `gdrive_move_file`, `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`,
+  `gdrive_transfer_ownership`, `gdrive_create_shortcut`. `gdrive_get_permissions` reads a file's
+  sharing list (read‑only) and flags anyone‑with‑link access; `gdrive_read_file` reads raw file
+  content (e.g. an uploaded CSV/TXT) as text.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
 - **Sheets (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
