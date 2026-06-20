@@ -3,8 +3,9 @@
 **English** · [Español](./README.es.md)
 
 Give a **local‑first AI assistant** safe, structured access to **your own** Google
-Workspace — Drive, Docs, Sheets, Slides, Gmail, Calendar, Apps Script, and Forms —
-using your own Google account, running entirely on your computer or server. Your
+Workspace — Drive, Docs, Sheets, Slides, Gmail, Calendar, Apps Script, Forms,
+BigQuery, and Looker Studio — using your own Google account, running entirely on
+your computer or server. Your
 credentials never leave your machine.
 
 It's built to pair with **[crow](https://maestro.press/software/crow-overview/)** —
@@ -29,7 +30,7 @@ so you're never locked in.
 
 ## What it can do
 
-**78 tools** across eight Google services:
+**84 tools** across ten Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
@@ -41,6 +42,8 @@ so you're never locked in.
 | **Calendar** | List/read/create events, respond to invites | 5 |
 | **Apps Script** | Read, edit, and push a project's script source; run functions | 4 |
 | **Forms** | Read a form's structure; add/edit questions **in place** (keeps the published URL) | 3 |
+| **BigQuery** | Run SQL (queries/DDL/DML); sync a Sheet range into a native table; list datasets/tables | 4 |
+| **Looker Studio** | Read-only governance: search reports/data sources and audit their sharing model | 2 |
 
 **Safety is built in.** There is no "replace the whole document" tool (it has
 destroyed formatting in the past); edits are surgical. The only tool that
@@ -121,9 +124,10 @@ protected data), and share this page with IT to discuss a path forward.
 >    controls → App access control* so it can use these Google APIs.
 >
 > It needs these APIs enabled: **Drive, Docs, Sheets, Slides, Gmail, Calendar,
-> Apps Script, Forms**, with scopes for reading/editing my own
-> Drive/Docs/Sheets/Slides, composing and managing my Gmail, managing my Calendar,
-> managing my own Apps Script projects, and editing my own Forms.
+> Apps Script, Forms, BigQuery, Looker Studio**, with scopes for reading/editing my
+> own Drive/Docs/Sheets/Slides, composing and managing my Gmail, managing my
+> Calendar, managing my own Apps Script projects, editing my own Forms, and
+> read‑only auditing of my BigQuery and Looker Studio assets.
 >
 > Thank you!
 
@@ -139,7 +143,8 @@ Do this in your browser, signed in as the account you'll use.
    of these (a few seconds each):
    **Google Drive API**, **Google Docs API**, **Google Sheets API**,
    **Google Slides API**, **Gmail API**, **Google Calendar API**,
-   **Apps Script API**, **Google Forms API**.
+   **Apps Script API**, **Google Forms API**, **BigQuery API**,
+   **Looker Studio API**.
 3. **Turn on the Apps Script API for your user** (only needed for the Apps Script
    tools). Visit [script.google.com/home/usersettings](https://script.google.com/home/usersettings)
    and switch **Google Apps Script API** to **On**. (This is a one‑time per‑user
@@ -278,7 +283,7 @@ protected data.
 
 ---
 
-## Tool reference (78 tools)
+## Tool reference (84 tools)
 
 - **Docs (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
@@ -311,6 +316,14 @@ protected data.
   Edits a form **in place** (createItem / updateItem / deleteItem), so the
   published responder URL — QR codes, flyers, prior emails — is preserved. Reads
   structure only, **not responses**. Requires the Google Forms API enabled.
+- **BigQuery (4):** `bigquery_query` (SELECT / DDL / DML), `bigquery_sync_sheet_to_table`
+  (full‑refresh a native table from a Sheet range), `bigquery_list_datasets`,
+  `bigquery_list_tables`. Project id defaults to the `GOOGLE_BIGQUERY_PROJECT` env var.
+  Requires the BigQuery API enabled + billing (or a BigQuery sandbox).
+- **Looker Studio (2):** `looker_search_assets` (find reports/data sources by owner/title),
+  `looker_get_permissions` (read an asset's sharing model — owner/editor/viewer/link‑viewer
+  members + an `is_public` flag — a re‑checkable sharing audit). Read‑only governance; there
+  is no report‑authoring API. Requires the Looker Studio API enabled.
 
 ---
 

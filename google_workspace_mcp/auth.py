@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import AuthorizedSession, Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -42,6 +42,15 @@ SCOPES = [
     # Requires the Forms API enabled in the OAuth client's GCP project. This is
     # forms.body (structure) only — NOT forms.responses.
     "https://www.googleapis.com/auth/forms.body",
+    # BigQuery API: run SQL (queries / DDL / DML), sync a Sheet range into a
+    # native table, and list datasets/tables. Requires the BigQuery API enabled
+    # in the OAuth client's GCP project and billing (or a BigQuery sandbox).
+    "https://www.googleapis.com/auth/bigquery",
+    # Looker Studio API (datastudio.googleapis.com) — GOVERNANCE / READ-ONLY:
+    # search reports/data sources and read their sharing model (a sharing audit).
+    # No report-authoring API exists. Requires the Looker Studio API enabled in
+    # the OAuth client's GCP project.
+    "https://www.googleapis.com/auth/datastudio.readonly",
 ]
 
 # Default credential paths, overridable via env vars:
@@ -190,6 +199,8 @@ _calendar_service = None
 _slides_service = None
 _script_service = None
 _forms_service = None
+_bigquery_service = None
+_looker_studio_session = None
 
 _NOT_AUTHED_HINT = (
     "Not authenticated. Run `google-workspace-mcp-authorize` to sign in "
@@ -292,10 +303,47 @@ def get_forms_service():
     return _forms_service
 
 
+def get_bigquery_service():
+    """Get or create BigQuery API v2 service.
+
+    Requires the BigQuery API enabled in the OAuth client's GCP project, the
+    `bigquery` scope granted (re-auth after adding the scope), and billing (or a
+    BigQuery sandbox) available on the project. Every bigquery_* tool takes a
+    project_id, defaulting to the GOOGLE_BIGQUERY_PROJECT env var."""
+    global _bigquery_service
+    if _bigquery_service is None:
+        auth = get_auth()
+        if not auth.is_authenticated():
+            raise RuntimeError(_NOT_AUTHED_HINT)
+        _bigquery_service = build("bigquery", "v2", credentials=auth.credentials)
+    return _bigquery_service
+
+
+def get_looker_studio_session():
+    """Get or create an AuthorizedSession for the Looker Studio API (datastudio v1).
+
+    NOT a googleapiclient discovery service: the Looker Studio API is absent from
+    the static discovery registry and its live discovery doc rejects OAuth-only
+    callers (needs an API key), so `build("datastudio", "v1")` cannot be used. The
+    API's v1 REST endpoints DO accept the OAuth bearer token, so the looker_studio
+    tools call them directly through this session (which auto-refreshes on 401).
+
+    Requires the Looker Studio API enabled in the OAuth client's GCP project and
+    the `datastudio.readonly` scope granted (re-auth after adding the scope)."""
+    global _looker_studio_session
+    if _looker_studio_session is None:
+        auth = get_auth()
+        if not auth.is_authenticated():
+            raise RuntimeError(_NOT_AUTHED_HINT)
+        _looker_studio_session = AuthorizedSession(auth.credentials)
+    return _looker_studio_session
+
+
 def refresh_services():
     """Force re-creation of services (after token refresh on 401)."""
     global _drive_service, _docs_service, _gmail_service, _sheets_service
     global _calendar_service, _slides_service, _script_service, _forms_service
+    global _bigquery_service, _looker_studio_session
     auth = get_auth()
     if auth._credentials and auth._credentials.expired and auth._credentials.refresh_token:
         auth._credentials.refresh(Request())
@@ -308,3 +356,5 @@ def refresh_services():
     _slides_service = None
     _script_service = None
     _forms_service = None
+    _bigquery_service = None
+    _looker_studio_session = None

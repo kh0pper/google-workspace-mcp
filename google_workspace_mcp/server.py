@@ -13,6 +13,8 @@ from fastmcp import FastMCP
 
 from . import docs, drive, comments, gmail, sheets, slides, apps_script, forms
 from . import calendar as gcal_mod
+from . import bigquery as bq_mod
+from . import looker_studio as looker_mod
 
 logger = logging.getLogger(__name__)
 
@@ -869,6 +871,89 @@ async def gslides_batch_update(presentation_id: str, requests: list) -> dict:
 async def gslides_export(presentation_id: str, fmt: str = "pdf", out_path: Optional[str] = None) -> dict:
     """Export the deck to a local file via Drive. fmt: 'pdf' or 'pptx'. Returns the path."""
     return await slides.gslides_export(presentation_id, fmt=fmt, out_path=out_path)
+
+
+# --- BigQuery Tools (run SQL; sync Sheets -> BQ; list datasets/tables) ---
+
+@mcp.tool()
+async def bigquery_query(
+    sql: str,
+    project_id: Optional[str] = None,
+    max_rows: int = 1000,
+    use_legacy_sql: bool = False,
+    location: Optional[str] = None,
+) -> dict:
+    """Run a BigQuery SQL statement (SELECT / DDL / DML) and return the result. The workhorse:
+    `SELECT k, COUNT(*) ... GROUP BY k`, `CREATE OR REPLACE TABLE ... AS SELECT`, DML. Standard SQL by
+    default; `max_rows` caps returned rows. project_id defaults to GOOGLE_BIGQUERY_PROJECT. Needs the
+    BigQuery API enabled + the `bigquery` scope (re-auth)."""
+    return await bq_mod.bigquery_query(
+        sql, project_id=project_id, max_rows=max_rows,
+        use_legacy_sql=use_legacy_sql, location=location,
+    )
+
+
+@mcp.tool()
+async def bigquery_sync_sheet_to_table(
+    spreadsheet_id: str,
+    sheet_range: str,
+    dataset: str,
+    table: str,
+    project_id: Optional[str] = None,
+    location: str = "US",
+    header_row: bool = True,
+) -> dict:
+    """Full-refresh a native BigQuery table from a Sheet range (first row = headers -> STRING columns).
+    Creates the dataset/table if needed and REPLACES the rows via insertAll. For a strict atomic swap,
+    use bigquery_query with CREATE OR REPLACE TABLE AS SELECT over an external Sheets table instead."""
+    return await bq_mod.bigquery_sync_sheet_to_table(
+        spreadsheet_id, sheet_range, dataset, table,
+        project_id=project_id, location=location, header_row=header_row,
+    )
+
+
+@mcp.tool()
+async def bigquery_list_datasets(project_id: Optional[str] = None) -> dict:
+    """List datasets (schemas) in a BigQuery project. project_id defaults to GOOGLE_BIGQUERY_PROJECT."""
+    return await bq_mod.bigquery_list_datasets(project_id=project_id)
+
+
+@mcp.tool()
+async def bigquery_list_tables(dataset: str, project_id: Optional[str] = None) -> dict:
+    """List tables in a BigQuery dataset, with row counts and types."""
+    return await bq_mod.bigquery_list_tables(dataset, project_id=project_id)
+
+
+# --- Looker Studio Tools (GOVERNANCE / READ-ONLY sharing audit; no report authoring) ---
+
+@mcp.tool()
+async def looker_search_assets(
+    asset_types: Optional[list] = None,
+    owner: Optional[str] = None,
+    title: Optional[str] = None,
+    include_trashed: bool = False,
+    page_size: int = 50,
+    page_token: Optional[str] = None,
+) -> dict:
+    """Search Looker Studio assets for a sharing/governance audit (read-only). `asset_types`: subset of
+    REPORT, DATA_SOURCE (default both; the API allows one type per call so both fans out to two calls).
+    Returns id, title, type, owner, creator, timestamps + a next_page_token. Needs the Looker Studio API
+    enabled + the `datastudio.readonly` scope (re-auth)."""
+    return await looker_mod.looker_search_assets(
+        asset_types=asset_types, owner=owner, title=title,
+        include_trashed=include_trashed, page_size=page_size, page_token=page_token,
+    )
+
+
+@mcp.tool()
+async def looker_get_permissions(asset_id: str) -> dict:
+    """Read a Looker Studio asset's sharing model — the sharing audit (read-only). `asset_id` = the
+    report/data-source uuid (e.g. from a report URL `.../reporting/<id>/...` or a looker_search_assets
+    result). Returns the permission roles + members (OWNER/EDITOR/VIEWER/LINK_VIEWER), an `is_public`
+    flag (true if shared to allUsers — internet), and `domain_link_viewers` (the `domain:` members of
+    LINK_VIEWER = "Anyone at <domain> with the link"). Needs the Looker Studio API + `datastudio.readonly`
+    scope."""
+    return await looker_mod.looker_get_permissions(asset_id=asset_id)
 
 
 def main():
