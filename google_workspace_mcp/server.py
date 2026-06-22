@@ -254,6 +254,12 @@ async def gdrive_create_shortcut(target_id: str, parent_id: str, name: str | Non
     return await drive.gdrive_create_shortcut(target_id, parent_id, name=name)
 
 
+@mcp.tool()
+async def gdrive_share(file_id: str, email: str, role: str = "writer", notify: bool = False) -> dict:
+    """Share a Drive file/folder with a user by email — ADDS a reader|writer|commenter permission (does NOT transfer ownership; use gdrive_transfer_ownership for that). Sharing a folder cascades to its contents. notify=False (default) grants silently; notify=True sends the 'shared with you' email (required for consumer/cross-domain recipients). Re-checkable via gdrive_get_permissions."""
+    return await drive.gdrive_share(file_id, email, role=role, notify=notify)
+
+
 # --- Comments Tools ---
 
 @mcp.tool()

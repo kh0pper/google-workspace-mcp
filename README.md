@@ -30,7 +30,7 @@ so you're never locked in.
 
 ## What it can do
 
-**84 tools** across ten Google services:
+**85 tools** across ten Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
@@ -283,7 +283,7 @@ protected data.
 
 ---
 
-## Tool reference (84 tools)
+## Tool reference (85 tools)
 
 - **Docs (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
@@ -297,10 +297,11 @@ protected data.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (13):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+- **Drive (14):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
   `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_read_file`, `gdrive_create_folder`,
   `gdrive_move_file`, `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`,
-  `gdrive_transfer_ownership`, `gdrive_create_shortcut`. `gdrive_get_permissions` reads a file's
+  `gdrive_transfer_ownership`, `gdrive_create_shortcut`, `gdrive_share`. `gdrive_share` adds a
+  reader/writer/commenter permission by email (does not transfer ownership); `gdrive_get_permissions` reads a file's
   sharing list (read‑only) and flags anyone‑with‑link access; `gdrive_read_file` reads raw file
   content (e.g. an uploaded CSV/TXT) as text.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,

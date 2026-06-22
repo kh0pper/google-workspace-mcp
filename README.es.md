@@ -31,7 +31,7 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**84 herramientas** en diez servicios de Google:
+**85 herramientas** en diez servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
@@ -299,7 +299,7 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (84 herramientas)
+## Referencia de herramientas (85 herramientas)
 
 - **Documentos (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
@@ -315,10 +315,11 @@ usar esto con datos protegidos.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (13):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+- **Drive (14):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
   `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_read_file`, `gdrive_create_folder`,
   `gdrive_move_file`, `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`,
-  `gdrive_transfer_ownership`, `gdrive_create_shortcut`. `gdrive_get_permissions` lee la lista de
+  `gdrive_transfer_ownership`, `gdrive_create_shortcut`, `gdrive_share`. `gdrive_share` agrega un
+  permiso de lector/escritor/comentarista por correo (no transfiere la propiedad); `gdrive_get_permissions` lee la lista de
   uso compartido de un archivo (solo lectura) y señala el acceso «cualquiera con el enlace»;
   `gdrive_read_file` lee el contenido sin procesar de un archivo (p. ej. un CSV/TXT subido) como texto.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,

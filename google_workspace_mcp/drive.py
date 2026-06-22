@@ -541,3 +541,42 @@ async def gdrive_create_shortcut(
             "target_id": target_id,
         },
     }
+
+
+@handle_google_errors
+async def gdrive_share(
+    file_id: str, email: str, role: str = "writer", notify: bool = False
+) -> dict:
+    """Share a Drive file/folder with a user by email — ADDS a permission, does NOT change
+    ownership (use gdrive_transfer_ownership for that). role = reader | writer | commenter.
+    Sharing a FOLDER cascades to its contents. notify=False (default) grants silently;
+    notify=True sends the 'shared with you' email. Same-domain Workspace users can be added
+    silently; consumer/cross-domain recipients require notify=True. Re-checkable afterward
+    via gdrive_get_permissions."""
+    drive = get_drive_service()
+    role = role.lower()
+    valid = {"reader", "writer", "commenter"}
+    if role not in valid:
+        return {
+            "success": False,
+            "error": f"role must be one of {sorted(valid)}, got '{role}'",
+        }
+    result = await asyncio.to_thread(
+        lambda: drive.permissions().create(
+            fileId=file_id,
+            body={"type": "user", "role": role, "emailAddress": email},
+            sendNotificationEmail=notify,
+            supportsAllDrives=True,
+            fields="id, role, type, emailAddress",
+        ).execute()
+    )
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "email": email,
+            "role": result.get("role"),
+            "permission_id": result.get("id"),
+            "notified": notify,
+        },
+    }
