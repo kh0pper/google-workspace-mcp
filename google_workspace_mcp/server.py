@@ -166,6 +166,28 @@ async def gdocs_rewrite_passages(
     return await docs.gdocs_rewrite_passages(doc_id, passages)
 
 
+@mcp.tool()
+async def gdocs_format_text(
+    doc_id: str,
+    find: str,
+    occurrence: int = 0,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    underline: Optional[bool] = None,
+    link_url: Optional[str] = None,
+    color_hex: Optional[str] = None,
+) -> dict:
+    """Apply inline character formatting to existing visible text in a Google Doc — the ONLY gdocs
+    tool that sets a HYPERLINK (find-replace/insert/rewrite cannot). Finds `find` and applies any of
+    bold/italic/underline, a link (`link_url`), and/or a text color (`color_hex` like '#1155cc').
+    `occurrence`: 0-based match index, or -1 for ALL matches. Adds/removes no text — style only. To
+    turn a bare URL into a labeled link: find-replace the label in, then format_text it with link_url."""
+    return await docs.gdocs_format_text(
+        doc_id, find, occurrence=occurrence, bold=bold, italic=italic,
+        underline=underline, link_url=link_url, color_hex=color_hex,
+    )
+
+
 # --- Drive Tools ---
 
 @mcp.tool()

@@ -30,11 +30,11 @@ so you're never locked in.
 
 ## What it can do
 
-**85 tools** across ten Google services:
+**86 tools** across ten Google services:
 
 | Service | What you can do | Tools |
 |---|---|---|
-| **Docs** | Read, search, and safely edit Google Docs (incl. comments + inline images) | 15 |
+| **Docs** | Read, search, and safely edit Google Docs (incl. comments, inline images, and inline text styling/hyperlinks) | 16 |
 | **Slides** | Read and build Google Slides decks | 17 |
 | **Gmail** | Search/read threads, draft replies, manage labels & filters | 11 |
 | **Sheets** | Read (incl. formulas), write, append; create/rename/delete tabs; number + visual formatting (colors/borders/widths/freeze) | 10 |
@@ -283,14 +283,16 @@ protected data.
 
 ---
 
-## Tool reference (85 tools)
+## Tool reference (86 tools)
 
-- **Docs (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
+- **Docs (16):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
-  `gdocs_replace_section`, `gdocs_create`, `gdocs_rewrite_passages`, plus
+  `gdocs_replace_section`, `gdocs_create`, `gdocs_rewrite_passages`, `gdocs_format_text`, plus
   comment tools (`gdocs_list_comments`, `gdocs_add_comment`, `gdocs_reply_comment`,
   `gdocs_resolve_comment`, `gdocs_apply_comment_edit`). `gdocs_insert_image` embeds a
-  local or Drive image inline (optionally replacing a placeholder token).
+  local or Drive image inline (optionally replacing a placeholder token);
+  `gdocs_format_text` is the only Docs tool that sets a hyperlink (plus bold/italic/underline/color)
+  on an existing run of text.
 - **Slides (17):** read/structure/notes, create deck, add/duplicate/delete/reorder
   slides, add text boxes & images, format text/paragraphs, find‑replace, export.
 - **Gmail (11):** `gmail_search_threads`, `gmail_get_thread`, `gmail_create_draft`,

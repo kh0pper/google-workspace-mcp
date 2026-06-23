@@ -38,6 +38,34 @@ def _find_anchor_index(doc: dict, anchor: str):
     return None
 
 
+def _find_text_ranges(doc: dict, text: str) -> list:
+    """[(start, end), ...] absolute doc-index ranges for each occurrence of `text` in the
+    body, mapping characters back to doc indices (handles matches that span multiple runs)."""
+    flat, idxs = [], []
+    for element in doc.get("body", {}).get("content", []):
+        para = element.get("paragraph")
+        if not para:
+            continue
+        for el in para.get("elements", []):
+            tr = el.get("textRun")
+            if not tr:
+                continue
+            content = tr.get("content", "")
+            start = el.get("startIndex", 0)
+            for i, ch in enumerate(content):
+                flat.append(ch)
+                idxs.append(start + i)
+    s = "".join(flat)
+    ranges = []
+    if not text:
+        return ranges
+    pos = s.find(text)
+    while pos >= 0:
+        ranges.append((idxs[pos], idxs[pos + len(text) - 1] + 1))
+        pos = s.find(text, pos + len(text))
+    return ranges
+
+
 def _png_size_px(path: str):
     """(width, height) in px for a PNG/GIF, or None if not determinable."""
     try:
@@ -273,6 +301,69 @@ async def gdocs_find_replace(
             "total_changes": sum(c["occurrences"] for c in counts),
         },
     }
+
+
+@handle_google_errors
+async def gdocs_format_text(
+    doc_id: str,
+    find: str,
+    occurrence: int = 0,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    underline: Optional[bool] = None,
+    link_url: Optional[str] = None,
+    color_hex: Optional[str] = None,
+) -> dict:
+    """Apply inline character formatting (bold/italic/underline/link/color) to an existing run of
+    visible text, located by `find`. Adds/removes no text — style only. `occurrence`: 0-based match
+    index, or -1 for ALL matches. Only the styles you pass are changed.
+
+    This is the only Docs tool that sets a HYPERLINK (find-replace/insert/rewrite cannot)."""
+    docs = get_docs_service()
+    doc = await asyncio.to_thread(lambda: docs.documents().get(documentId=doc_id).execute())
+    ranges = _find_text_ranges(doc, find)
+    if not ranges:
+        return {"success": False, "error": f"Text not found: {find!r}"}
+    if occurrence == -1:
+        targets = ranges
+    elif 0 <= occurrence < len(ranges):
+        targets = [ranges[occurrence]]
+    else:
+        return {"success": False, "error": f"occurrence {occurrence} out of range (found {len(ranges)} match(es))"}
+
+    style: dict = {}
+    fields: list[str] = []
+    if bold is not None:
+        style["bold"] = bold; fields.append("bold")
+    if italic is not None:
+        style["italic"] = italic; fields.append("italic")
+    if underline is not None:
+        style["underline"] = underline; fields.append("underline")
+    if link_url is not None:
+        style["link"] = {"url": link_url}; fields.append("link")
+    if color_hex is not None:
+        h = color_hex.lstrip("#")
+        style["foregroundColor"] = {"color": {"rgbColor": {
+            "red": int(h[0:2], 16) / 255.0,
+            "green": int(h[2:4], 16) / 255.0,
+            "blue": int(h[4:6], 16) / 255.0,
+        }}}
+        fields.append("foregroundColor")
+    if not fields:
+        return {"success": False, "error": "No style provided (set at least one of bold/italic/underline/link_url/color_hex)."}
+
+    requests = [{
+        "updateTextStyle": {
+            "range": {"startIndex": s, "endIndex": e},
+            "textStyle": style,
+            "fields": ",".join(fields),
+        }
+    } for (s, e) in targets]
+
+    await asyncio.to_thread(
+        lambda: docs.documents().batchUpdate(documentId=doc_id, body={"requests": requests}).execute()
+    )
+    return {"success": True, "data": {"doc_id": doc_id, "find": find, "styled": len(targets), "fields": fields}}
 
 
 @handle_google_errors

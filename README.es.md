@@ -31,11 +31,11 @@ así que nunca quedas atado a una sola IA.
 
 ## Qué puede hacer
 
-**85 herramientas** en diez servicios de Google:
+**86 herramientas** en diez servicios de Google:
 
 | Servicio | Qué puedes hacer | Herramientas |
 |---|---|---|
-| **Documentos** | Leer, buscar y editar de forma segura Google Docs (incl. comentarios e imágenes en línea) | 15 |
+| **Documentos** | Leer, buscar y editar de forma segura Google Docs (incl. comentarios, imágenes en línea y formato/hipervínculos de texto en línea) | 16 |
 | **Presentaciones** | Leer y crear presentaciones de Google Slides | 17 |
 | **Gmail** | Buscar/leer conversaciones, redactar respuestas, gestionar etiquetas y filtros | 11 |
 | **Hojas de cálculo** | Leer (incl. fórmulas), escribir y agregar datos; crear/renombrar/eliminar pestañas; formato numérico y visual (colores/bordes/anchos/inmovilizar) | 10 |
@@ -299,15 +299,17 @@ usar esto con datos protegidos.
 
 ---
 
-## Referencia de herramientas (85 herramientas)
+## Referencia de herramientas (86 herramientas)
 
-- **Documentos (15):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
+- **Documentos (16):** `gdocs_read`, `gdocs_read_section`, `gdocs_get_structure`,
   `gdocs_find_replace`, `gdocs_append`, `gdocs_insert_image`, `gdocs_insert_at_heading`,
-  `gdocs_replace_section`, `gdocs_create`, `gdocs_rewrite_passages`, más
+  `gdocs_replace_section`, `gdocs_create`, `gdocs_rewrite_passages`, `gdocs_format_text`, más
   herramientas de comentarios (`gdocs_list_comments`, `gdocs_add_comment`,
   `gdocs_reply_comment`, `gdocs_resolve_comment`, `gdocs_apply_comment_edit`).
   `gdocs_insert_image` inserta una imagen (local o de Drive) en línea (opcionalmente
-  reemplazando un marcador de posición).
+  reemplazando un marcador de posición); `gdocs_format_text` es la única herramienta de
+  Documentos que aplica un hipervínculo (además de negrita/cursiva/subrayado/color) a un
+  fragmento de texto existente.
 - **Presentaciones (17):** leer/estructura/notas, crear presentación,
   agregar/duplicar/eliminar/reordenar diapositivas, agregar cuadros de texto e
   imágenes, dar formato a texto/párrafos, buscar y reemplazar, exportar.
