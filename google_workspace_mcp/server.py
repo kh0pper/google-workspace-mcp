@@ -738,6 +738,17 @@ async def forms_batch_update(form_id: str, requests: list) -> dict:
     return await forms.forms_batch_update(form_id, requests)
 
 
+@mcp.tool()
+async def forms_set_destination(
+    form_id: str, spreadsheet_id: str, shim_script_id: Optional[str] = None
+) -> dict:
+    """Link a Google Form's responses into a spreadsheet (the UI's 'Link to Sheets' — creates a 'Form Responses'
+    tab there). The REST Forms API can't do this, so the call runs through a one-time-deployed Apps Script shim
+    (see apps-script-shim/forms-destination-shim.gs); without the shim configured (GWS_FORMS_SHIM_SCRIPT_ID env or
+    `shim_script_id`) the tool returns the setup instructions instead. Verifies via the form's linkedSheetId."""
+    return await forms.forms_set_destination(form_id, spreadsheet_id, shim_script_id=shim_script_id)
+
+
 # --- Slides Tools (Phase 1: read + notes-safe find/replace) ---
 
 @mcp.tool()

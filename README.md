@@ -315,10 +315,15 @@ protected data.
   `apps_script_update_content`, `apps_script_run`. Requires the Apps Script API
   enabled + the per‑user toggle at script.google.com/home/usersettings;
   `apps_script_run` also needs an API‑Executable deployment.
-- **Forms (3):** `forms_get_structure`, `forms_add_question`, `forms_batch_update`.
-  Edits a form **in place** (createItem / updateItem / deleteItem), so the
-  published responder URL — QR codes, flyers, prior emails — is preserved. Reads
-  structure only, **not responses**. Requires the Google Forms API enabled.
+- **Forms (4):** `forms_get_structure`, `forms_add_question`, `forms_batch_update`,
+  `forms_set_destination`. Edits a form **in place** (createItem / updateItem /
+  deleteItem), so the published responder URL — QR codes, flyers, prior emails — is
+  preserved. Reads structure only, **not responses**. Requires the Google Forms API
+  enabled. `forms_set_destination` links a form's responses into a spreadsheet (the
+  UI's "Link to Sheets" — the REST API can't do it); it needs a one‑time Apps Script
+  shim deployment, documented in `apps-script-shim/forms-destination-shim.gs`, plus
+  the `https://www.googleapis.com/auth/forms` scope. Unconfigured, the tool returns
+  the setup steps instead of failing opaquely.
 - **BigQuery (4):** `bigquery_query` (SELECT / DDL / DML), `bigquery_sync_sheet_to_table`
   (full‑refresh a native table from a Sheet range), `bigquery_list_datasets`,
   `bigquery_list_tables`. Project id defaults to the `GOOGLE_BIGQUERY_PROJECT` env var.
