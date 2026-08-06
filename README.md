@@ -360,8 +360,8 @@ paragraph. To keep lines stacked, such as an email signature or an address, end 
 one with a hard break, which is two trailing spaces or a trailing backslash:
 
 ```markdown
-Jane Doe··
-Director of Something··
+Jane Doe\
+Director of Something\
 Example Organization
 ```
 

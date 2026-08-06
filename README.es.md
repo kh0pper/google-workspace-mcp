@@ -378,8 +378,8 @@ termina cada línea con un salto forzado, o sea dos espacios finales o una barra
 invertida final:
 
 ```markdown
-Jane Doe··
-Directora de Algo··
+Jane Doe\
+Directora de Algo\
 Organización de Ejemplo
 ```
 
