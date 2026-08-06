@@ -348,6 +348,26 @@ protected data.
 - **A scope was denied:** if you unchecked a permission during sign‑in, re‑run
   authorize and approve all requested permissions.
 
+### Writing markdown into Docs
+
+The Docs writing tools (`gdocs_append`, `gdocs_insert_at_heading`,
+`gdocs_replace_section`, `gdocs_create`) take markdown and follow standard markdown
+line handling: a single newline is a soft wrap inside a paragraph or list item, and
+only a blank line starts a new paragraph.
+
+That means a run of short lines with no blank line between them folds into **one**
+paragraph. To keep lines stacked, such as an email signature or an address, end each
+one with a hard break, which is two trailing spaces or a trailing backslash:
+
+```markdown
+Jane Doe··
+Director of Something··
+Example Organization
+```
+
+Headings, list markers, table rows, and blockquotes each open their own block and are
+never folded into the line above.
+
 ### Configuration (environment variables)
 
 | Variable | Default | Purpose |

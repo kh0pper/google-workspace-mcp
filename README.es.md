@@ -365,6 +365,27 @@ usar esto con datos protegidos.
 - **Se denegó un permiso (scope):** si desmarcaste un permiso durante el inicio de
   sesión, vuelve a ejecutar la autorización y aprueba todos los permisos solicitados.
 
+### Escribir markdown en Docs
+
+Las herramientas de escritura de Docs (`gdocs_append`, `gdocs_insert_at_heading`,
+`gdocs_replace_section`, `gdocs_create`) reciben markdown y siguen el manejo de líneas
+estándar de markdown: un solo salto de línea es un ajuste dentro del párrafo o del
+elemento de lista, y solo una línea en blanco inicia un párrafo nuevo.
+
+Es decir, varias líneas cortas seguidas, sin línea en blanco entre ellas, se unen en
+**un** párrafo. Para mantenerlas apiladas, como en una firma de correo o una dirección,
+termina cada línea con un salto forzado, o sea dos espacios finales o una barra
+invertida final:
+
+```markdown
+Jane Doe··
+Directora de Algo··
+Organización de Ejemplo
+```
+
+Los encabezados, los marcadores de lista, las filas de tabla y las citas abren su propio
+bloque y nunca se unen a la línea anterior.
+
 ### Configuración (variables de entorno)
 
 | Variable | Predeterminado | Para qué sirve |
