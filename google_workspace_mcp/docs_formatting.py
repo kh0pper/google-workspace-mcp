@@ -233,6 +233,71 @@ def _utf16_len(text: str) -> int:
     return len(text.encode("utf-16-le")) // 2
 
 
+# --- Soft wraps ---
+
+_HEADING_LINE_RE = re.compile(r"^#{1,6}\s+")
+_BULLET_LINE_RE = re.compile(r"^[-*+]\s+")
+_ORDERED_LINE_RE = re.compile(r"^\d+\.\s+")
+
+
+def _starts_own_block(stripped: str) -> bool:
+    """True if this line opens a block that must not fold into the line above."""
+    return bool(
+        _HEADING_LINE_RE.match(stripped)
+        or _BULLET_LINE_RE.match(stripped)
+        or _ORDERED_LINE_RE.match(stripped)
+        or stripped.startswith("|")
+        or stripped.startswith(">")
+    )
+
+
+def _ends_with_hard_break(raw: str) -> bool:
+    """Markdown hard line break: two trailing spaces, or a trailing backslash."""
+    without_newline = raw.rstrip("\n")
+    return without_newline.endswith("  ") or without_newline.endswith("\\")
+
+
+def fold_soft_wraps(lines: list[str]) -> list[str]:
+    """
+    Join lines that markdown treats as soft wraps inside one block.
+
+    A single newline wraps text within a paragraph or list item; only a blank
+    line starts a new paragraph. Without this, source markdown hard-wrapped for
+    readability renders with a paragraph break at every wrap point.
+
+    Headings, list markers, table rows, and blockquotes each open their own
+    block and never fold upward. A heading never absorbs the line beneath it.
+    Lines ending in two spaces or a backslash keep their break, which is how a
+    stacked block such as an email signature stays stacked.
+    """
+    folded: list[str] = []
+    # Whether the last emitted line can still take a continuation.
+    open_for_continuation = False
+
+    for raw in lines:
+        stripped = raw.strip()
+
+        if not stripped:
+            folded.append("")
+            open_for_continuation = False
+            continue
+
+        if open_for_continuation and not _starts_own_block(stripped):
+            folded[-1] = f"{folded[-1]} {stripped}"
+        else:
+            folded.append(stripped)
+
+        last = folded[-1]
+        open_for_continuation = (
+            not _ends_with_hard_break(raw)
+            and not _HEADING_LINE_RE.match(last)
+            and not last.startswith("|")
+        )
+
+    # Strip the hard-break markers now that they have done their job.
+    return [line.rstrip("\\").rstrip() for line in folded]
+
+
 # --- GFM pipe tables ---
 
 _TABLE_SEPARATOR_RE = re.compile(r"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$")
@@ -320,7 +385,7 @@ def markdown_to_docs_requests(
     Returns:
         (requests, end_index) -- list of API requests and the new end index
     """
-    lines = markdown.split("\n")
+    lines = fold_soft_wraps(markdown.split("\n"))
 
     parsed_lines = []
     for line in lines:
