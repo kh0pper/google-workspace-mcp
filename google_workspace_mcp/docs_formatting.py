@@ -7,6 +7,7 @@ Handles reading (Docs structure -> markdown) and writing (markdown -> Docs API r
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 # --- Reading: Google Docs structure -> Markdown ---
 
@@ -182,9 +183,11 @@ def docs_structure_to_markdown(doc_body: dict, doc_title: str, lists_info: dict)
 
 # --- Writing: Markdown -> Google Docs API requests ---
 
+
 @dataclass
 class TextSpan:
     """A span of text with formatting flags."""
+
     text: str
     bold: bool = False
     italic: bool = False
@@ -230,9 +233,89 @@ def _utf16_len(text: str) -> int:
     return len(text.encode("utf-16-le")) // 2
 
 
-def markdown_to_docs_requests(markdown: str, start_index: int = 1) -> tuple[list[dict], int]:
+# --- GFM pipe tables ---
+
+_TABLE_SEPARATOR_RE = re.compile(r"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$")
+
+
+def _parse_table_row(line: str) -> list[str]:
+    """Split one GFM pipe-table row into stripped cell strings."""
+    row = line.strip()
+    if row.startswith("|"):
+        row = row[1:]
+    if row.endswith("|"):
+        row = row[:-1]
+    return [c.strip() for c in row.split("|")]
+
+
+def split_markdown_segments(markdown: str) -> "list[tuple[str, Any]]":
+    """
+    Split markdown into ("md", text) and ("table", rows) segments.
+
+    A table block is a pipe row followed by a GFM separator row (|---|---|),
+    plus every consecutive following line starting with "|". The separator row
+    is dropped; each row is a list of cell strings padded/truncated to the
+    header's column count. Everything else stays in "md" segments, preserving
+    line order, for markdown_to_docs_requests.
+
+    Native-table rendering lives in docs.py (insertTable needs its own API
+    round trips); this splitter stays pure.
+    """
+    lines = markdown.split("\n")
+    segments: "list[tuple[str, Any]]" = []
+    md_buf: list[str] = []
+    i, n = 0, len(lines)
+    while i < n:
+        stripped = lines[i].strip()
+        nxt = lines[i + 1].strip() if i + 1 < n else ""
+        if (
+            stripped.startswith("|")
+            and "|" in stripped[1:]
+            and "-" in nxt
+            and _TABLE_SEPARATOR_RE.match(nxt)
+        ):
+            header = _parse_table_row(stripped)
+            cols = len(header)
+            rows = [header]
+            i += 2
+            while i < n and lines[i].strip().startswith("|"):
+                cells = _parse_table_row(lines[i])
+                rows.append((cells + [""] * cols)[:cols])
+                i += 1
+            if md_buf:
+                segments.append(("md", "\n".join(md_buf)))
+                md_buf = []
+            segments.append(("table", rows))
+            continue
+        md_buf.append(lines[i])
+        i += 1
+    if md_buf:
+        segments.append(("md", "\n".join(md_buf)))
+    return segments
+
+
+def markdown_to_docs_requests(
+    markdown: str,
+    start_index: int = 1,
+    reset_normal_text: bool = False,
+    font_family: str | None = None,
+) -> tuple[list[dict], int]:
     """
     Convert markdown to Google Docs batchUpdate requests.
+
+    Args:
+        markdown: Source markdown.
+        start_index: Document index the content is inserted at.
+        reset_normal_text: Emit a NORMAL_TEXT reset over the inserted range,
+            for insertions that land after a heading (see ordering note below).
+        font_family: Apply this font to every inserted run, so the text cannot
+            inherit the document's default font on export.
+
+    Request order is load-bearing. Google applies a named style's full
+    definition when namedStyleType is set, so a NORMAL_TEXT reset emitted after
+    the styling requests wipes both the heading styles and the character
+    formatting of everything it covers. Emission order is therefore:
+    insert -> NORMAL_TEXT reset -> heading styles -> bullets -> font -> runs.
 
     Returns:
         (requests, end_index) -- list of API requests and the new end index
@@ -251,34 +334,47 @@ def markdown_to_docs_requests(markdown: str, start_index: int = 1) -> tuple[list
         if heading_match:
             level = len(heading_match.group(1))
             content = heading_match.group(2)
-            parsed_lines.append({
-                "type": "heading", "level": level,
-                "text": content, "spans": _parse_inline_formatting(content),
-            })
+            parsed_lines.append(
+                {
+                    "type": "heading",
+                    "level": level,
+                    "text": content,
+                    "spans": _parse_inline_formatting(content),
+                }
+            )
             continue
 
         bullet_match = re.match(r"^[-*+]\s+(.+)$", stripped)
         if bullet_match:
             content = bullet_match.group(1)
-            parsed_lines.append({
-                "type": "bullet", "text": content,
-                "spans": _parse_inline_formatting(content),
-            })
+            parsed_lines.append(
+                {
+                    "type": "bullet",
+                    "text": content,
+                    "spans": _parse_inline_formatting(content),
+                }
+            )
             continue
 
         ordered_match = re.match(r"^\d+\.\s+(.+)$", stripped)
         if ordered_match:
             content = ordered_match.group(1)
-            parsed_lines.append({
-                "type": "ordered", "text": content,
-                "spans": _parse_inline_formatting(content),
-            })
+            parsed_lines.append(
+                {
+                    "type": "ordered",
+                    "text": content,
+                    "spans": _parse_inline_formatting(content),
+                }
+            )
             continue
 
-        parsed_lines.append({
-            "type": "normal", "text": stripped,
-            "spans": _parse_inline_formatting(stripped),
-        })
+        parsed_lines.append(
+            {
+                "type": "normal",
+                "text": stripped,
+                "spans": _parse_inline_formatting(stripped),
+            }
+        )
 
     plain_lines = []
     formatting = []
@@ -311,7 +407,9 @@ def markdown_to_docs_requests(markdown: str, start_index: int = 1) -> tuple[list
         line_end = current_offset
 
         if parsed["type"] == "heading":
-            paragraph_styles.append((line_start, line_end, f"HEADING_{parsed['level']}"))
+            paragraph_styles.append(
+                (line_start, line_end, f"HEADING_{parsed['level']}")
+            )
         elif parsed["type"] == "bullet":
             bullet_ranges.append((line_start, line_end, "BULLET_DISC_CIRCLE_SQUARE"))
         elif parsed["type"] == "ordered":
@@ -323,29 +421,80 @@ def markdown_to_docs_requests(markdown: str, start_index: int = 1) -> tuple[list
         return [], start_index
 
     requests = []
+    end_index = start_index + _utf16_len(plain_text)
 
     # 1. Insert the plain text
-    requests.append({
-        "insertText": {
-            "location": {"index": start_index},
-            "text": plain_text,
-        }
-    })
-
-    # 2. Apply heading styles
-    for line_start, line_end, style_name in paragraph_styles:
-        requests.append({
-            "updateParagraphStyle": {
-                "range": {
-                    "startIndex": start_index + line_start,
-                    "endIndex": start_index + line_end,
-                },
-                "paragraphStyle": {"namedStyleType": style_name},
-                "fields": "namedStyleType",
+    requests.append(
+        {
+            "insertText": {
+                "location": {"index": start_index},
+                "text": plain_text,
             }
-        })
+        }
+    )
 
-    # 3. Apply inline formatting
+    # 2. Reset the whole range to NORMAL_TEXT, before anything is styled.
+    # Text inserted after a heading otherwise inherits that heading's style.
+    if reset_normal_text:
+        requests.append(
+            {
+                "updateParagraphStyle": {
+                    "range": {
+                        "startIndex": start_index,
+                        "endIndex": end_index,
+                    },
+                    "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                    "fields": "namedStyleType",
+                }
+            }
+        )
+
+    # 3. Apply heading styles
+    for line_start, line_end, style_name in paragraph_styles:
+        requests.append(
+            {
+                "updateParagraphStyle": {
+                    "range": {
+                        "startIndex": start_index + line_start,
+                        "endIndex": start_index + line_end,
+                    },
+                    "paragraphStyle": {"namedStyleType": style_name},
+                    "fields": "namedStyleType",
+                }
+            }
+        )
+
+    # 4. Apply bullet/ordered list styles
+    for line_start, line_end, bullet_preset in bullet_ranges:
+        requests.append(
+            {
+                "createParagraphBullets": {
+                    "range": {
+                        "startIndex": start_index + line_start,
+                        "endIndex": start_index + line_end,
+                    },
+                    "bulletPreset": bullet_preset,
+                }
+            }
+        )
+
+    # 5. Pin the font across the range. After the named styles, which each
+    # carry their own font, and before the runs, so bold survives.
+    if font_family:
+        requests.append(
+            {
+                "updateTextStyle": {
+                    "range": {
+                        "startIndex": start_index,
+                        "endIndex": end_index,
+                    },
+                    "textStyle": {"weightedFontFamily": {"fontFamily": font_family}},
+                    "fields": "weightedFontFamily",
+                }
+            }
+        )
+
+    # 6. Apply inline formatting last, so nothing downstream flattens it
     for span_start, span_end, is_bold, is_italic in formatting:
         fields = []
         style = {}
@@ -356,28 +505,17 @@ def markdown_to_docs_requests(markdown: str, start_index: int = 1) -> tuple[list
             fields.append("italic")
             style["italic"] = True
 
-        requests.append({
-            "updateTextStyle": {
-                "range": {
-                    "startIndex": start_index + span_start,
-                    "endIndex": start_index + span_end,
-                },
-                "textStyle": style,
-                "fields": ",".join(fields),
+        requests.append(
+            {
+                "updateTextStyle": {
+                    "range": {
+                        "startIndex": start_index + span_start,
+                        "endIndex": start_index + span_end,
+                    },
+                    "textStyle": style,
+                    "fields": ",".join(fields),
+                }
             }
-        })
+        )
 
-    # 4. Apply bullet/ordered list styles
-    for line_start, line_end, bullet_preset in bullet_ranges:
-        requests.append({
-            "createParagraphBullets": {
-                "range": {
-                    "startIndex": start_index + line_start,
-                    "endIndex": start_index + line_end,
-                },
-                "bulletPreset": bullet_preset,
-            }
-        })
-
-    end_index = start_index + _utf16_len(plain_text)
     return requests, end_index

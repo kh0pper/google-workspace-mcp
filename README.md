@@ -356,6 +356,7 @@ protected data.
 | `GOOGLE_TOKEN_FILE` | `~/.config/google-workspace-mcp/token.json` | Where your sign‑in token is stored |
 | `GOOGLE_OAUTH_LOCAL_PORT` | `8090` | Local port used during browser sign‑in |
 | `GMAIL_SEND_TO_SELF_ALLOWLIST` | *(empty)* | Comma‑separated addresses `gmail_send_to_self` may send to |
+| `GDOCS_DEFAULT_FONT` | *(empty)* | Font applied to text the Docs writing tools insert, e.g. `Open Sans`. Empty means inherit the document's own default. Set it when exported files must not pick up the template font. |
 
 ---
 

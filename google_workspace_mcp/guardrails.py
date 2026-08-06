@@ -2,8 +2,12 @@
 Google Docs API guardrails — encodes documented pitfalls as reusable functions.
 
 Each function addresses a specific failure mode documented in auto-memory:
-- fix_heading_inheritance: heading style leaks to inserted body text
 - paginated_comments: comments API truncates at 20 without pagination
+
+Heading-inheritance is handled inside markdown_to_docs_requests rather than
+here: the NORMAL_TEXT reset has to be emitted before the styling requests, and
+a standalone builder invites callers to append it afterwards, which flattens
+every heading and bold run it covers.
 """
 
 import functools
@@ -37,6 +41,7 @@ def handle_google_errors(func: Callable) -> Callable:
                 # Try one token refresh
                 try:
                     from .auth import refresh_services
+
                     refresh_services()
                     return await func(*args, **kwargs)
                 except Exception as retry_err:
@@ -65,33 +70,3 @@ def handle_google_errors(func: Callable) -> Callable:
             }
 
     return wrapper
-
-
-def build_heading_inheritance_fix(
-    start_index: int, end_index: int
-) -> dict:
-    """
-    Build a NORMAL_TEXT reset request for content inserted after a heading.
-
-    Addresses: reference_gdocs_api_quirks.md — insertText after a heading
-    causes all inserted paragraphs to inherit the heading's namedStyleType.
-
-    Args:
-        start_index: Start of the inserted content range
-        end_index: End of the inserted content range
-
-    Returns:
-        An updateParagraphStyle request dict
-    """
-    return {
-        "updateParagraphStyle": {
-            "range": {
-                "startIndex": start_index,
-                "endIndex": end_index,
-            },
-            "paragraphStyle": {
-                "namedStyleType": "NORMAL_TEXT",
-            },
-            "fields": "namedStyleType",
-        }
-    }

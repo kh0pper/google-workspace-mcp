@@ -9,15 +9,32 @@ import asyncio
 import logging
 import os
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from googleapiclient.http import MediaFileUpload
 
 from .auth import get_docs_service, get_drive_service
-from .docs_formatting import docs_structure_to_markdown, markdown_to_docs_requests
-from .guardrails import handle_google_errors, build_heading_inheritance_fix
+from .docs_formatting import (
+    _parse_inline_formatting,
+    _utf16_len,
+    docs_structure_to_markdown,
+    markdown_to_docs_requests,
+    split_markdown_segments,
+)
+from .guardrails import handle_google_errors
 
 logger = logging.getLogger(__name__)
+
+
+def _default_font() -> Optional[str]:
+    """
+    Font pinned on every inserted run, from GDOCS_DEFAULT_FONT.
+
+    Unset means inherit the document's default, which is how Docs behaves on its
+    own. Setting it stops exported docx from picking up the template default
+    (Arial) where the deployment expects something else.
+    """
+    return os.environ.get("GDOCS_DEFAULT_FONT", "").strip() or None
 
 
 def _find_anchor_index(doc: dict, anchor: str):
@@ -67,12 +84,14 @@ def _find_text_ranges(doc: dict, text: str) -> list:
 
 
 def _png_size_px(path: str):
-    """(width, height) in px for a PNG/GIF, or None if not determinable."""
+    """(width, height) in px for a PNG/GIF/JPEG, or None if not determinable."""
     try:
         with open(path, "rb") as fh:
             head = fh.read(26)
         if head[:8] == b"\x89PNG\r\n\x1a\n":
-            return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+            return int.from_bytes(head[16:20], "big"), int.from_bytes(
+                head[20:24], "big"
+            )
         if head[:6] in (b"GIF87a", b"GIF89a"):
             return struct.unpack("<HH", head[6:10])
     except Exception:
@@ -110,12 +129,14 @@ def _parse_headings(doc: dict) -> list[dict]:
                 text += tr.get("content", "").strip()
 
         if text:
-            headings.append({
-                "level": level,
-                "text": text,
-                "start_index": element.get("startIndex", 0),
-                "end_index": element.get("endIndex", 0),
-            })
+            headings.append(
+                {
+                    "level": level,
+                    "text": text,
+                    "start_index": element.get("startIndex", 0),
+                    "end_index": element.get("endIndex", 0),
+                }
+            )
 
     return headings
 
@@ -145,7 +166,7 @@ def _find_section_range(
 
     # Find end: next heading at same or higher level
     section_end = None
-    for h in headings[target + 1:]:
+    for h in headings[target + 1 :]:
         if h["level"] <= heading_level:
             section_end = h["start_index"]
             break
@@ -220,7 +241,8 @@ async def gdocs_read_section(doc_id: str, heading: str) -> dict:
     # Extract just the elements in this range
     section_body = {
         "content": [
-            el for el in body_content
+            el
+            for el in body_content
             if el.get("startIndex", 0) >= section_start
             and el.get("endIndex", 0) <= section_end
         ]
@@ -267,31 +289,37 @@ async def gdocs_find_replace(
 
     requests = []
     for pair in replacements:
-        requests.append({
-            "replaceAllText": {
-                "containsText": {
-                    "text": pair["find"],
-                    "matchCase": pair.get("match_case", match_case),
-                },
-                "replaceText": pair["replace"],
+        requests.append(
+            {
+                "replaceAllText": {
+                    "containsText": {
+                        "text": pair["find"],
+                        "matchCase": pair.get("match_case", match_case),
+                    },
+                    "replaceText": pair["replace"],
+                }
             }
-        })
+        )
 
     result = await asyncio.to_thread(
-        lambda: docs.documents().batchUpdate(
-            documentId=doc_id, body={"requests": requests}
-        ).execute()
+        lambda: (
+            docs.documents()
+            .batchUpdate(documentId=doc_id, body={"requests": requests})
+            .execute()
+        )
     )
 
     replies = result.get("replies", [])
     counts = []
     for i, reply in enumerate(replies):
         count = reply.get("replaceAllText", {}).get("occurrencesChanged", 0)
-        counts.append({
-            "find": replacements[i]["find"],
-            "replace": replacements[i]["replace"],
-            "occurrences": count,
-        })
+        counts.append(
+            {
+                "find": replacements[i]["find"],
+                "replace": replacements[i]["replace"],
+                "occurrences": count,
+            }
+        )
 
     return {
         "success": True,
@@ -320,7 +348,9 @@ async def gdocs_format_text(
 
     This is the only Docs tool that sets a HYPERLINK (find-replace/insert/rewrite cannot)."""
     docs = get_docs_service()
-    doc = await asyncio.to_thread(lambda: docs.documents().get(documentId=doc_id).execute())
+    doc = await asyncio.to_thread(
+        lambda: docs.documents().get(documentId=doc_id).execute()
+    )
     ranges = _find_text_ranges(doc, find)
     if not ranges:
         return {"success": False, "error": f"Text not found: {find!r}"}
@@ -329,46 +359,249 @@ async def gdocs_format_text(
     elif 0 <= occurrence < len(ranges):
         targets = [ranges[occurrence]]
     else:
-        return {"success": False, "error": f"occurrence {occurrence} out of range (found {len(ranges)} match(es))"}
+        return {
+            "success": False,
+            "error": f"occurrence {occurrence} out of range (found {len(ranges)} match(es))",
+        }
 
     style: dict = {}
     fields: list[str] = []
     if bold is not None:
-        style["bold"] = bold; fields.append("bold")
+        style["bold"] = bold
+        fields.append("bold")
     if italic is not None:
-        style["italic"] = italic; fields.append("italic")
+        style["italic"] = italic
+        fields.append("italic")
     if underline is not None:
-        style["underline"] = underline; fields.append("underline")
+        style["underline"] = underline
+        fields.append("underline")
     if link_url is not None:
-        style["link"] = {"url": link_url}; fields.append("link")
+        style["link"] = {"url": link_url}
+        fields.append("link")
     if color_hex is not None:
         h = color_hex.lstrip("#")
-        style["foregroundColor"] = {"color": {"rgbColor": {
-            "red": int(h[0:2], 16) / 255.0,
-            "green": int(h[2:4], 16) / 255.0,
-            "blue": int(h[4:6], 16) / 255.0,
-        }}}
+        style["foregroundColor"] = {
+            "color": {
+                "rgbColor": {
+                    "red": int(h[0:2], 16) / 255.0,
+                    "green": int(h[2:4], 16) / 255.0,
+                    "blue": int(h[4:6], 16) / 255.0,
+                }
+            }
+        }
         fields.append("foregroundColor")
     if not fields:
-        return {"success": False, "error": "No style provided (set at least one of bold/italic/underline/link_url/color_hex)."}
-
-    requests = [{
-        "updateTextStyle": {
-            "range": {"startIndex": s, "endIndex": e},
-            "textStyle": style,
-            "fields": ",".join(fields),
+        return {
+            "success": False,
+            "error": "No style provided (set at least one of bold/italic/underline/link_url/color_hex).",
         }
-    } for (s, e) in targets]
+
+    requests = [
+        {
+            "updateTextStyle": {
+                "range": {"startIndex": s, "endIndex": e},
+                "textStyle": style,
+                "fields": ",".join(fields),
+            }
+        }
+        for (s, e) in targets
+    ]
 
     await asyncio.to_thread(
-        lambda: docs.documents().batchUpdate(documentId=doc_id, body={"requests": requests}).execute()
+        lambda: (
+            docs.documents()
+            .batchUpdate(documentId=doc_id, body={"requests": requests})
+            .execute()
+        )
     )
-    return {"success": True, "data": {"doc_id": doc_id, "find": find, "styled": len(targets), "fields": fields}}
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "find": find,
+            "styled": len(targets),
+            "fields": fields,
+        },
+    }
+
+
+async def _insert_markdown_with_tables(
+    docs,
+    doc_id: str,
+    markdown: str,
+    insert_at: int,
+    reset_normal_text: bool = False,
+) -> int:
+    """
+    Insert markdown at insert_at, rendering GFM pipe tables as NATIVE Docs
+    tables (insertTable + cell fill + bold header row) instead of literal
+    pipe text. Non-table segments go through markdown_to_docs_requests.
+
+    Tables need their own API round trips (insertTable creates empty cells
+    whose indices are only knowable from a fresh GET), so this runs one
+    batchUpdate per segment plus two GETs per table. Returns the end index
+    after all inserted content.
+    """
+    font = _default_font()
+    pos = insert_at
+    for kind, payload in split_markdown_segments(markdown):
+        if kind == "md":
+            requests, new_end = markdown_to_docs_requests(
+                cast(str, payload),
+                start_index=pos,
+                reset_normal_text=reset_normal_text,
+                font_family=font,
+            )
+            if requests:
+                await asyncio.to_thread(
+                    lambda r=requests: (
+                        docs.documents()
+                        .batchUpdate(documentId=doc_id, body={"requests": r})
+                        .execute()
+                    )
+                )
+                pos = new_end
+            continue
+
+        rows = cast("list[list[str]]", payload)
+        n_rows, n_cols = len(rows), len(rows[0])
+        await asyncio.to_thread(
+            lambda p=pos: (
+                docs.documents()
+                .batchUpdate(
+                    documentId=doc_id,
+                    body={
+                        "requests": [
+                            {
+                                "insertTable": {
+                                    "rows": n_rows,
+                                    "columns": n_cols,
+                                    "location": {"index": p},
+                                }
+                            }
+                        ]
+                    },
+                )
+                .execute()
+            )
+        )
+
+        def _find_table(doc, at):
+            for el in doc.get("body", {}).get("content", []):
+                if "table" in el and el["startIndex"] >= at:
+                    return el
+            return None
+
+        doc = await asyncio.to_thread(
+            lambda: docs.documents().get(documentId=doc_id).execute()
+        )
+        table = _find_table(doc, pos)
+        assert table is not None, "inserted table not found on re-read"
+
+        # Fill cells in reverse document order so indices stay valid.
+        fills = []
+        for r, trow in enumerate(table["table"]["tableRows"]):
+            for c, cell in enumerate(trow["tableCells"]):
+                text = "".join(s.text for s in _parse_inline_formatting(rows[r][c]))
+                if text:
+                    fills.append((cell["content"][0]["startIndex"], text))
+        if fills:
+            fills.sort(key=lambda t: -t[0])
+            await asyncio.to_thread(
+                lambda f=fills: (
+                    docs.documents()
+                    .batchUpdate(
+                        documentId=doc_id,
+                        body={
+                            "requests": [
+                                {"insertText": {"location": {"index": i}, "text": t}}
+                                for i, t in f
+                            ]
+                        },
+                    )
+                    .execute()
+                )
+            )
+
+        # Re-read for final cell positions: bold the header row and apply
+        # any inline bold/italic spans inside cells.
+        doc = await asyncio.to_thread(
+            lambda: docs.documents().get(documentId=doc_id).execute()
+        )
+        table = _find_table(doc, pos)
+        assert table is not None, "inserted table not found on re-read"
+        style_reqs = []
+        for r, trow in enumerate(table["table"]["tableRows"]):
+            for c, cell in enumerate(trow["tableCells"]):
+                para = cell["content"][0]
+                cell_start = para["startIndex"]
+                if font and para["endIndex"] - 1 > cell_start:
+                    style_reqs.append(
+                        {
+                            "updateTextStyle": {
+                                "range": {
+                                    "startIndex": cell_start,
+                                    "endIndex": para["endIndex"] - 1,
+                                },
+                                "textStyle": {
+                                    "weightedFontFamily": {"fontFamily": font}
+                                },
+                                "fields": "weightedFontFamily",
+                            }
+                        }
+                    )
+                if r == 0 and para["endIndex"] - 1 > cell_start:
+                    style_reqs.append(
+                        {
+                            "updateTextStyle": {
+                                "range": {
+                                    "startIndex": cell_start,
+                                    "endIndex": para["endIndex"] - 1,
+                                },
+                                "textStyle": {"bold": True},
+                                "fields": "bold",
+                            }
+                        }
+                    )
+                offset = 0
+                for span in _parse_inline_formatting(rows[r][c]):
+                    span_len = _utf16_len(span.text)
+                    if span.bold or span.italic:
+                        style, fields = {}, []
+                        if span.bold:
+                            style["bold"] = True
+                            fields.append("bold")
+                        if span.italic:
+                            style["italic"] = True
+                            fields.append("italic")
+                        style_reqs.append(
+                            {
+                                "updateTextStyle": {
+                                    "range": {
+                                        "startIndex": cell_start + offset,
+                                        "endIndex": cell_start + offset + span_len,
+                                    },
+                                    "textStyle": style,
+                                    "fields": ",".join(fields),
+                                }
+                            }
+                        )
+                    offset += span_len
+        if style_reqs:
+            await asyncio.to_thread(
+                lambda s=style_reqs: (
+                    docs.documents()
+                    .batchUpdate(documentId=doc_id, body={"requests": s})
+                    .execute()
+                )
+            )
+        pos = table["endIndex"]
+    return pos
 
 
 @handle_google_errors
 async def gdocs_append(doc_id: str, markdown: str) -> dict:
-    """Append formatted markdown to end of document."""
+    """Append formatted markdown to end of document. GFM pipe tables render as native tables."""
     docs = get_docs_service()
 
     # Get current end index
@@ -382,14 +615,7 @@ async def gdocs_append(doc_id: str, markdown: str) -> dict:
             end_index = max(end_index, element["endIndex"])
 
     insert_at = end_index - 1
-    requests, new_end = markdown_to_docs_requests(markdown, start_index=insert_at)
-
-    if requests:
-        await asyncio.to_thread(
-            lambda: docs.documents().batchUpdate(
-                documentId=doc_id, body={"requests": requests}
-            ).execute()
-        )
+    new_end = await _insert_markdown_with_tables(docs, doc_id, markdown, insert_at)
 
     return {
         "success": True,
@@ -402,9 +628,7 @@ async def gdocs_append(doc_id: str, markdown: str) -> dict:
 
 
 @handle_google_errors
-async def gdocs_insert_at_heading(
-    doc_id: str, heading: str, markdown: str
-) -> dict:
+async def gdocs_insert_at_heading(doc_id: str, heading: str, markdown: str) -> dict:
     """
     Insert content after a specific heading.
 
@@ -431,19 +655,12 @@ async def gdocs_insert_at_heading(
             "error": f"Heading '{heading}' not found. Available: {[h['text'] for h in headings_list]}",
         }
 
-    # Insert after the heading's end index
+    # Insert after the heading's end index. GFM pipe tables become native
+    # tables; the NORMAL_TEXT guardrail is applied per markdown segment.
     insert_at = target["end_index"]
-    requests, new_end = markdown_to_docs_requests(markdown, start_index=insert_at)
-
-    # Guardrail: reset all inserted content to NORMAL_TEXT to prevent heading inheritance
-    if requests:
-        requests.append(build_heading_inheritance_fix(insert_at, new_end))
-
-        await asyncio.to_thread(
-            lambda: docs.documents().batchUpdate(
-                documentId=doc_id, body={"requests": requests}
-            ).execute()
-        )
+    new_end = await _insert_markdown_with_tables(
+        docs, doc_id, markdown, insert_at, reset_normal_text=True
+    )
 
     return {
         "success": True,
@@ -458,9 +675,7 @@ async def gdocs_insert_at_heading(
 
 
 @handle_google_errors
-async def gdocs_replace_section(
-    doc_id: str, heading: str, markdown: str
-) -> dict:
+async def gdocs_replace_section(doc_id: str, heading: str, markdown: str) -> dict:
     """
     Replace content between two headings (safe heading-to-heading delete+reinsert).
 
@@ -507,19 +722,18 @@ async def gdocs_replace_section(
             }
         }
     }
-
-    # Step 2: Insert new content at the deletion point
-    insert_requests, new_end = markdown_to_docs_requests(markdown, start_index=content_start)
-
-    # Step 3: Reset to NORMAL_TEXT (heading inheritance guardrail)
-    all_requests = [delete_request] + insert_requests
-    if insert_requests:
-        all_requests.append(build_heading_inheritance_fix(content_start, new_end))
-
     await asyncio.to_thread(
-        lambda: docs.documents().batchUpdate(
-            documentId=doc_id, body={"requests": all_requests}
-        ).execute()
+        lambda: (
+            docs.documents()
+            .batchUpdate(documentId=doc_id, body={"requests": [delete_request]})
+            .execute()
+        )
+    )
+
+    # Step 2: Insert new content at the deletion point. GFM pipe tables become
+    # native tables; the NORMAL_TEXT guardrail is applied per markdown segment.
+    new_end = await _insert_markdown_with_tables(
+        docs, doc_id, markdown, content_start, reset_normal_text=True
     )
 
     return {
@@ -556,10 +770,15 @@ async def gdocs_create(
             f"and mimeType = 'application/vnd.google-apps.document' and trashed = false"
         )
         result = await asyncio.to_thread(
-            lambda: drive.files().list(
-                q=query, spaces="drive",
-                fields="files(id, name, webViewLink)",
-            ).execute()
+            lambda: (
+                drive.files()
+                .list(
+                    q=query,
+                    spaces="drive",
+                    fields="files(id, name, webViewLink)",
+                )
+                .execute()
+            )
         )
         files = result.get("files", [])
         if files:
@@ -581,30 +800,32 @@ async def gdocs_create(
 
     # Move to target folder
     await asyncio.to_thread(
-        lambda: drive.files().update(
-            fileId=doc_id,
-            addParents=folder_id,
-            removeParents="root",
-            fields="id, parents",
-        ).execute()
+        lambda: (
+            drive.files()
+            .update(
+                fileId=doc_id,
+                addParents=folder_id,
+                removeParents="root",
+                fields="id, parents",
+            )
+            .execute()
+        )
     )
 
-    # Insert content if provided
+    # Insert content if provided (GFM pipe tables render as native tables)
     if content.strip():
-        insert_requests, _ = markdown_to_docs_requests(content, start_index=1)
-        if insert_requests:
-            await asyncio.to_thread(
-                lambda: docs.documents().batchUpdate(
-                    documentId=doc_id, body={"requests": insert_requests}
-                ).execute()
-            )
+        await _insert_markdown_with_tables(docs, doc_id, content, 1)
 
     # Get final metadata
     file_meta = await asyncio.to_thread(
-        lambda: drive.files().get(
-            fileId=doc_id,
-            fields="id, name, webViewLink, modifiedTime",
-        ).execute()
+        lambda: (
+            drive.files()
+            .get(
+                fileId=doc_id,
+                fields="id, name, webViewLink, modifiedTime",
+            )
+            .execute()
+        )
     )
 
     return {
@@ -619,9 +840,7 @@ async def gdocs_create(
 
 
 @handle_google_errors
-async def gdocs_rewrite_passages(
-    doc_id: str, passages: list[dict]
-) -> dict:
+async def gdocs_rewrite_passages(doc_id: str, passages: list[dict]) -> dict:
     """
     Rewrite specific paragraphs by anchored prefix match.
 
@@ -662,14 +881,15 @@ async def gdocs_rewrite_passages(
         if not para:
             continue
         text = "".join(
-            r.get("textRun", {}).get("content", "")
-            for r in para.get("elements", [])
+            r.get("textRun", {}).get("content", "") for r in para.get("elements", [])
         )
-        paragraphs.append({
-            "start": elem.get("startIndex"),
-            "end": elem.get("endIndex"),
-            "text": text,
-        })
+        paragraphs.append(
+            {
+                "start": elem.get("startIndex"),
+                "end": elem.get("endIndex"),
+                "text": text,
+            }
+        )
 
     matches = []
     used_paragraph_starts = set()
@@ -677,11 +897,13 @@ async def gdocs_rewrite_passages(
         prefix = (p.get("match_prefix") or "").strip()
         new_text = p.get("new_text") or ""
         if not prefix:
-            matches.append({
-                "match_prefix": "",
-                "matched": False,
-                "error": "Empty match_prefix",
-            })
+            matches.append(
+                {
+                    "match_prefix": "",
+                    "matched": False,
+                    "error": "Empty match_prefix",
+                }
+            )
             continue
         # Truncate the prefix to avoid hyper-long fingerprints
         anchor = prefix[:100]
@@ -694,22 +916,26 @@ async def gdocs_rewrite_passages(
                 found = pg
                 break
         if found is None:
-            matches.append({
-                "match_prefix": anchor[:60],
-                "matched": False,
-                "error": "No paragraph starts with this prefix",
-            })
+            matches.append(
+                {
+                    "match_prefix": anchor[:60],
+                    "matched": False,
+                    "error": "No paragraph starts with this prefix",
+                }
+            )
             continue
         used_paragraph_starts.add(found["start"])
-        matches.append({
-            "match_prefix": anchor[:60],
-            "matched": True,
-            "paragraph_range": {"start": found["start"], "end": found["end"]},
-            "original_length": len(found["text"]),
-            "new_length": len(new_text),
-            "_paragraph": found,
-            "_new_text": new_text,
-        })
+        matches.append(
+            {
+                "match_prefix": anchor[:60],
+                "matched": True,
+                "paragraph_range": {"start": found["start"], "end": found["end"]},
+                "original_length": len(found["text"]),
+                "new_length": len(new_text),
+                "_paragraph": found,
+                "_new_text": new_text,
+            }
+        )
 
     # Build batchUpdate requests in REVERSE document order so index shifts
     # from earlier replacements don't break the indices of later ones.
@@ -731,32 +957,36 @@ async def gdocs_rewrite_passages(
         else:
             delete_end = end_idx
         if delete_end > start_idx:
-            requests.append({
-                "deleteContentRange": {
-                    "range": {"startIndex": start_idx, "endIndex": delete_end}
+            requests.append(
+                {
+                    "deleteContentRange": {
+                        "range": {"startIndex": start_idx, "endIndex": delete_end}
+                    }
                 }
-            })
+            )
         if new_text:
-            requests.append({
-                "insertText": {
-                    "location": {"index": start_idx},
-                    "text": new_text,
+            requests.append(
+                {
+                    "insertText": {
+                        "location": {"index": start_idx},
+                        "text": new_text,
+                    }
                 }
-            })
+            )
 
     if requests:
         await asyncio.to_thread(
-            lambda: docs.documents().batchUpdate(
-                documentId=doc_id, body={"requests": requests}
-            ).execute()
+            lambda: (
+                docs.documents()
+                .batchUpdate(documentId=doc_id, body={"requests": requests})
+                .execute()
+            )
         )
 
     # Strip internal '_paragraph' / '_new_text' before returning
     clean_results = []
     for m in matches:
-        clean_results.append({
-            k: v for k, v in m.items() if not k.startswith("_")
-        })
+        clean_results.append({k: v for k, v in m.items() if not k.startswith("_")})
 
     return {
         "success": True,
@@ -791,8 +1021,7 @@ async def gdocs_insert_image(
     stores its own copy in the document. A local image is therefore uploaded to
     Drive, shared anyone-with-link **briefly**, inserted, then un-shared and (unless
     keep_drive_copy) trashed — the embedded copy in the doc is self-contained. The
-    brief public window means: do NOT use this for images containing sensitive or
-    regulated data (e.g. records covered by FERPA/HIPAA)."""
+    brief public window means: do NOT use this for images containing student PII."""
     docs = get_docs_service()
     drive = get_drive_service()
 
@@ -802,9 +1031,15 @@ async def gdocs_insert_image(
     if is_local:
         media = MediaFileUpload(image, resumable=False)
         up = await asyncio.to_thread(
-            lambda: drive.files().create(
-                body={"name": os.path.basename(image)}, media_body=media, fields="id"
-            ).execute()
+            lambda: (
+                drive.files()
+                .create(
+                    body={"name": os.path.basename(image)},
+                    media_body=media,
+                    fields="id",
+                )
+                .execute()
+            )
         )
         file_id = up["id"]
         temp_id = file_id
@@ -815,9 +1050,15 @@ async def gdocs_insert_image(
     try:
         # 2. share anyone-with-link reader so the Docs API can fetch it
         perm = await asyncio.to_thread(
-            lambda: drive.permissions().create(
-                fileId=file_id, body={"type": "anyone", "role": "reader"}, fields="id"
-            ).execute()
+            lambda: (
+                drive.permissions()
+                .create(
+                    fileId=file_id,
+                    body={"type": "anyone", "role": "reader"},
+                    fields="id",
+                )
+                .execute()
+            )
         )
         perm_id = perm["id"]
 
@@ -828,10 +1069,12 @@ async def gdocs_insert_image(
             if wh and wh[0] and wh[1]:
                 w_px, h_px = wh
                 width_pt = min(float(max_width_pt), w_px * 72.0 / 96.0)
-                size_req = {"objectSize": {
-                    "width": {"magnitude": width_pt, "unit": "PT"},
-                    "height": {"magnitude": width_pt * h_px / w_px, "unit": "PT"},
-                }}
+                size_req = {
+                    "objectSize": {
+                        "width": {"magnitude": width_pt, "unit": "PT"},
+                        "height": {"magnitude": width_pt * h_px / w_px, "unit": "PT"},
+                    }
+                }
 
         # 4. resolve the insertion index
         if anchor_text:
@@ -840,54 +1083,78 @@ async def gdocs_insert_image(
             )
             start = _find_anchor_index(doc, anchor_text)
             if start is None:
-                return {"success": False,
-                        "error": f"anchor_text not found in doc: {anchor_text!r}",
-                        "data": {"doc_id": doc_id}}
+                return {
+                    "success": False,
+                    "error": f"anchor_text not found in doc: {anchor_text!r}",
+                    "data": {"doc_id": doc_id},
+                }
             requests = [
-                {"deleteContentRange": {"range": {
-                    "startIndex": start, "endIndex": start + len(anchor_text)}}},
+                {
+                    "deleteContentRange": {
+                        "range": {
+                            "startIndex": start,
+                            "endIndex": start + len(anchor_text),
+                        }
+                    }
+                },
             ]
         else:
             start = 1 if index is None else int(index)
             requests = []
-        img_req = {"location": {"index": start},
-                   "uri": f"https://drive.google.com/uc?export=view&id={file_id}"}
+        img_req = {
+            "location": {"index": start},
+            "uri": f"https://drive.google.com/uc?export=view&id={file_id}",
+        }
         img_req.update(size_req)
         requests.append({"insertInlineImage": img_req})
 
         # 5. apply (delete-anchor + insert-image are sequential in one batchUpdate)
         await asyncio.to_thread(
-            lambda: docs.documents().batchUpdate(
-                documentId=doc_id, body={"requests": requests}
-            ).execute()
+            lambda: (
+                docs.documents()
+                .batchUpdate(documentId=doc_id, body={"requests": requests})
+                .execute()
+            )
         )
     finally:
         # 6. always revoke the public permission we added
         if perm_id:
             try:
                 await asyncio.to_thread(
-                    lambda: drive.permissions().delete(
-                        fileId=file_id, permissionId=perm_id).execute()
+                    lambda: (
+                        drive.permissions()
+                        .delete(fileId=file_id, permissionId=perm_id)
+                        .execute()
+                    )
                 )
             except Exception as e:
-                logger.warning("could not revoke public permission on %s: %s", file_id, e)
+                logger.warning(
+                    "could not revoke public permission on %s: %s", file_id, e
+                )
 
     # 7. trash the temp upload (the doc holds its own copy now)
     trashed = False
     if temp_id and not keep_drive_copy:
         try:
             await asyncio.to_thread(
-                lambda: drive.files().update(fileId=temp_id, body={"trashed": True}).execute()
+                lambda: (
+                    drive.files()
+                    .update(fileId=temp_id, body={"trashed": True})
+                    .execute()
+                )
             )
             trashed = True
         except Exception as e:
             logger.warning("could not trash temp upload %s: %s", temp_id, e)
 
-    return {"success": True, "data": {
-        "doc_id": doc_id,
-        "inserted_at_index": start,
-        "replaced_anchor": anchor_text,
-        "image_drive_id": file_id,
-        "temp_upload_trashed": trashed,
-        "kept_drive_copy": bool(keep_drive_copy and temp_id),
-    }}
+    return {
+        "success": True,
+        "data": {
+            "doc_id": doc_id,
+            "inserted_at_index": start,
+            "replaced_anchor": anchor_text,
+            "image_drive_id": file_id,
+            "temp_upload_trashed": trashed,
+            "kept_drive_copy": bool(keep_drive_copy and temp_id),
+        },
+    }

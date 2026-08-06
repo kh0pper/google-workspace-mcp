@@ -373,6 +373,7 @@ usar esto con datos protegidos.
 | `GOOGLE_TOKEN_FILE` | `~/.config/google-workspace-mcp/token.json` | Dónde se guarda tu token de inicio de sesión |
 | `GOOGLE_OAUTH_LOCAL_PORT` | `8090` | Puerto local usado durante el inicio de sesión en el navegador |
 | `GMAIL_SEND_TO_SELF_ALLOWLIST` | *(vacío)* | Direcciones separadas por comas a las que `gmail_send_to_self` puede enviar |
+| `GDOCS_DEFAULT_FONT` | *(vacío)* | Fuente aplicada al texto que insertan las herramientas de escritura de Docs, por ejemplo `Open Sans`. Vacío significa heredar la fuente predeterminada del documento. Úsala cuando los archivos exportados no deban tomar la fuente de la plantilla. |
 
 ---
 
