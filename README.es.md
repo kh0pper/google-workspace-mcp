@@ -326,7 +326,8 @@ usar esto con datos protegidos.
   `gdrive_read_file` lee el contenido sin procesar de un archivo (p. ej. un CSV/TXT subido) como texto.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Hojas de cálculo (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+- **Hojas de cálculo (11):** `sheets_list`, `sheets_create` (hoja de cálculo nueva, con
+  carpeta y pestañas opcionales), `sheets_read` (incl. `value_render_option=FORMULA`),
   `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
   `sheets_delete_tab`, `sheets_set_number_format`, `sheets_get_tabs`, `sheets_batch_update`.
 - **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,

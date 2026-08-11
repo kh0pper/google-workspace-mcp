@@ -6,7 +6,7 @@ import asyncio
 import logging
 import re
 
-from .auth import get_sheets_service
+from .auth import get_drive_service, get_sheets_service
 from .guardrails import handle_google_errors
 
 logger = logging.getLogger(__name__)
@@ -91,6 +91,85 @@ async def sheets_list(spreadsheet_id: str) -> dict:
                 }
                 for s in sheets
             ],
+        },
+    }
+
+
+@handle_google_errors
+async def sheets_create(
+    title: str,
+    folder_id: str | None = None,
+    tabs: list | None = None,
+    find_existing: bool = True,
+) -> dict:
+    """Create a new Google Spreadsheet, optionally inside a Drive folder.
+
+    With find_existing=True (default) and a folder_id, an existing spreadsheet with
+    the same title in that folder is returned instead of creating a duplicate.
+    `tabs` (optional) names the initial tabs: the first replaces the default
+    "Sheet1", the rest are appended in order.
+    """
+    drive = get_drive_service()
+    svc = get_sheets_service()
+
+    if find_existing and folder_id:
+        safe_title = title.replace("\\", "\\\\").replace("'", "\\'")
+        query = (
+            f"name = '{safe_title}' and '{folder_id}' in parents "
+            f"and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+        )
+        result = await asyncio.to_thread(
+            lambda: drive.files()
+            .list(q=query, spaces="drive", fields="files(id, name, webViewLink)")
+            .execute()
+        )
+        files = result.get("files", [])
+        if files:
+            return {
+                "success": True,
+                "data": {
+                    "spreadsheet_id": files[0]["id"],
+                    "title": files[0]["name"],
+                    "web_view_link": files[0].get("webViewLink"),
+                    "created": False,
+                },
+            }
+
+    body: dict = {"name": title, "mimeType": "application/vnd.google-apps.spreadsheet"}
+    if folder_id:
+        body["parents"] = [folder_id]
+    created = await asyncio.to_thread(
+        lambda: drive.files()
+        .create(body=body, fields="id, name, webViewLink, parents")
+        .execute()
+    )
+    spreadsheet_id = created["id"]
+
+    tab_titles = [t for t in (tabs or []) if t]
+    if tab_titles:
+        requests = []
+        default_id = (await _sheet_props(svc, spreadsheet_id))[0]["sheetId"]
+        requests.append(
+            {
+                "updateSheetProperties": {
+                    "properties": {"sheetId": default_id, "title": tab_titles[0]},
+                    "fields": "title",
+                }
+            }
+        )
+        for i, tab_title in enumerate(tab_titles[1:], start=1):
+            requests.append({"addSheet": {"properties": {"title": tab_title, "index": i}}})
+        await _batch_update(svc, spreadsheet_id, requests)
+
+    return {
+        "success": True,
+        "data": {
+            "spreadsheet_id": spreadsheet_id,
+            "title": created.get("name", title),
+            "web_view_link": created.get("webViewLink"),
+            "parents": created.get("parents", []),
+            "tabs": tab_titles or ["Sheet1"],
+            "created": True,
         },
     }
 

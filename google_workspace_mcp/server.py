@@ -601,6 +601,22 @@ async def sheets_list(spreadsheet_id: str) -> dict:
 
 
 @mcp.tool()
+async def sheets_create(
+    title: str,
+    folder_id: str | None = None,
+    tabs: list | None = None,
+    find_existing: bool = True,
+) -> dict:
+    """Create a new Google Spreadsheet, optionally inside a Drive folder. With find_existing=True
+    (default) and a folder_id, returns an existing same-title spreadsheet in that folder instead of
+    creating a duplicate. `tabs` (optional) names the initial tabs: the first replaces the default
+    'Sheet1', the rest are appended in order."""
+    return await sheets.sheets_create(
+        title, folder_id=folder_id, tabs=tabs, find_existing=find_existing
+    )
+
+
+@mcp.tool()
 async def sheets_read(
     spreadsheet_id: str, range: str, value_render_option: str = "FORMATTED_VALUE"
 ) -> dict:

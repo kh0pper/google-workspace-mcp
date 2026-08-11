@@ -308,7 +308,8 @@ protected data.
   content (e.g. an uploaded CSV/TXT) as text.
 - **Calendar (5):** `gcal_list_calendars`, `gcal_list_events`, `gcal_get_event`,
   `gcal_create_event`, `gcal_respond_to_event`.
-- **Sheets (10):** `sheets_list`, `sheets_read` (incl. `value_render_option=FORMULA`),
+- **Sheets (11):** `sheets_list`, `sheets_create` (new spreadsheet, optional folder +
+  named tabs), `sheets_read` (incl. `value_render_option=FORMULA`),
   `sheets_write`, `sheets_append`, `sheets_add_tab`, `sheets_rename_tab`,
   `sheets_delete_tab`, `sheets_set_number_format`, `sheets_get_tabs`, `sheets_batch_update`.
 - **Apps Script (4):** `apps_script_get_content`, `apps_script_update_file`,
