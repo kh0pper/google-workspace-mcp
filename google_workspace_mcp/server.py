@@ -259,6 +259,39 @@ async def gdrive_trash_file(file_id: str) -> dict:
 
 
 @mcp.tool()
+async def gdrive_download_file(file_id: str, local_path: str) -> dict:
+    """Download a Drive file's bytes to a local path (binary-safe, no size cap). Uploaded files only
+    (PDF, images, docx, zip, ...); Google-native files have no raw bytes — use gdrive_export."""
+    return await drive.gdrive_download_file(file_id, local_path)
+
+
+@mcp.tool()
+async def gdrive_export(file_id: str, local_path: str, mime_type: Optional[str] = None) -> dict:
+    """Export a Google-native file (Doc/Sheet/Slides/Drawing) to a local path. mime_type defaults to
+    application/pdf; pass docx/xlsx/csv MIME types for those formats. Export API caps output at 10 MB.
+    Non-native files: use gdrive_download_file."""
+    return await drive.gdrive_export(file_id, local_path, mime_type=mime_type)
+
+
+@mcp.tool()
+async def gdrive_upload_file(
+    local_path: str, folder_id: str, name: Optional[str] = None, mime_type: Optional[str] = None
+) -> dict:
+    """Upload a local file into a Drive folder as a NEW file. name defaults to the local basename.
+    To replace an existing file's content keeping its id and links, use gdrive_upload_new_version."""
+    return await drive.gdrive_upload_file(local_path, folder_id, name=name, mime_type=mime_type)
+
+
+@mcp.tool()
+async def gdrive_upload_new_version(
+    file_id: str, local_path: str, mime_type: Optional[str] = None
+) -> dict:
+    """Replace an existing Drive file's content with a new version. The id, name, sharing, and links
+    stay stable (the ledgered-id workflow); prior content stays in Drive version history."""
+    return await drive.gdrive_upload_new_version(file_id, local_path, mime_type=mime_type)
+
+
+@mcp.tool()
 async def gdrive_rename(file_id: str, new_name: str) -> dict:
     """Rename a Drive file or folder. Changes the display name ONLY — the file ID is unchanged, so links, add-on configs, IMPORTRANGE, and anything that references it by ID keep working. Returns old_name + name."""
     return await drive.gdrive_rename(file_id, new_name)
@@ -289,7 +322,8 @@ async def gdocs_list_comments(
     doc_id: str, include_resolved: bool = False
 ) -> dict:
     """
-    List ALL comments on a Google Doc with full pagination.
+    List ALL comments on a Drive file with full pagination. Works on ANY Drive
+    file (PDFs, images, uploaded docx), not only Google Docs.
     Uses pageSize=100 + nextPageToken loop (no truncation at 20).
     """
     return await comments.gdocs_list_comments(doc_id, include_resolved)
@@ -299,7 +333,7 @@ async def gdocs_list_comments(
 async def gdocs_add_comment(
     doc_id: str, content: str, quoted_text: Optional[str] = None
 ) -> dict:
-    """Add a comment to a Google Doc, optionally anchored to specific text."""
+    """Add a comment to a Drive file, optionally anchored to specific text. Works on ANY Drive file (PDFs, images, uploaded docx), not only Google Docs."""
     return await comments.gdocs_add_comment(doc_id, content, quoted_text)
 
 
@@ -307,13 +341,13 @@ async def gdocs_add_comment(
 async def gdocs_reply_comment(
     doc_id: str, comment_id: str, content: str
 ) -> dict:
-    """Reply to a comment on a Google Doc."""
+    """Reply to a comment on a Drive file. Works on ANY Drive file (PDFs, images, uploaded docx), not only Google Docs."""
     return await comments.gdocs_reply_comment(doc_id, comment_id, content)
 
 
 @mcp.tool()
 async def gdocs_resolve_comment(doc_id: str, comment_id: str) -> dict:
-    """Resolve a comment on a Google Doc."""
+    """Resolve a comment on a Drive file. Works on ANY Drive file (PDFs, images, uploaded docx), not only Google Docs."""
     return await comments.gdocs_resolve_comment(doc_id, comment_id)
 
 

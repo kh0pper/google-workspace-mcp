@@ -317,8 +317,11 @@ usar esto con datos protegidos.
   `gmail_create_threaded_reply`, `gmail_send_to_self`, `gmail_send_threaded_to_self`,
   `gmail_label_thread`, `gmail_archive`, `gmail_list_labels`, `gmail_create_label`,
   `gmail_create_filter`.
-- **Drive (14):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
-  `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_read_file`, `gdrive_create_folder`,
+- **Drive (18):** `gdrive_search`, `gdrive_list_folder`, `gdrive_find_folder`,
+  `gdrive_get_metadata`, `gdrive_get_permissions`, `gdrive_read_file`, `gdrive_download_file`
+  (descarga binaria a una ruta local), `gdrive_export` (archivos nativos de Google a PDF/docx/xlsx/csv),
+  `gdrive_upload_file`, `gdrive_upload_new_version` (reemplaza el contenido manteniendo el id),
+  `gdrive_create_folder`,
   `gdrive_move_file`, `gdrive_copy_file`, `gdrive_trash_file`, `gdrive_rename`,
   `gdrive_transfer_ownership`, `gdrive_create_shortcut`, `gdrive_share`. `gdrive_share` agrega un
   permiso de lector/escritor/comentarista por correo (no transfiere la propiedad); `gdrive_get_permissions` lee la lista de

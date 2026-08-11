@@ -5,7 +5,10 @@ Google Drive API tools — folder listing, search, metadata.
 import asyncio
 import base64
 import logging
+import os
 from typing import Optional
+
+from googleapiclient.http import MediaFileUpload
 
 from .auth import get_drive_service
 from .guardrails import handle_google_errors
@@ -580,3 +583,146 @@ async def gdrive_share(
             "notified": notify,
         },
     }
+
+_GOOGLE_NATIVE_PREFIX = "application/vnd.google-apps."
+
+_EXPORT_DEFAULT_MIME = "application/pdf"
+
+
+@handle_google_errors
+async def gdrive_download_file(file_id: str, local_path: str) -> dict:
+    """Download a Drive file's bytes to a local path (binary-safe, no size cap).
+
+    For uploaded files only (PDF, images, docx, zip, ...). Google-native files
+    (Docs/Sheets/Slides) have no raw bytes; use gdrive_export for those.
+    """
+    drive = get_drive_service()
+    meta = await asyncio.to_thread(
+        lambda: drive.files().get(
+            fileId=file_id, fields="id, name, mimeType, size", supportsAllDrives=True
+        ).execute()
+    )
+    mime = meta.get("mimeType", "")
+    if mime.startswith(_GOOGLE_NATIVE_PREFIX):
+        return {
+            "success": False,
+            "error": (
+                f"'{meta.get('name')}' is a Google-native file ({mime}) with no raw "
+                f"bytes to download. Use gdrive_export to convert it (e.g. to PDF or docx)."
+            ),
+        }
+    data = await asyncio.to_thread(
+        lambda: drive.files().get_media(fileId=file_id).execute()
+    )
+    with open(local_path, "wb") as f:
+        f.write(data)
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "name": meta.get("name"),
+            "mime_type": mime,
+            "local_path": local_path,
+            "bytes_written": len(data),
+        },
+    }
+
+
+@handle_google_errors
+async def gdrive_export(
+    file_id: str, local_path: str, mime_type: Optional[str] = None
+) -> dict:
+    """Export a Google-native file (Doc/Sheet/Slides/Drawing) to a local path.
+
+    `mime_type` picks the format (default application/pdf). Common choices:
+    Docs -> application/vnd.openxmlformats-officedocument.wordprocessingml.document (docx);
+    Sheets -> application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (xlsx) or text/csv;
+    Slides -> application/pdf. The Drive export API caps output at 10 MB.
+    Non-native files have no export path; use gdrive_download_file for those.
+    """
+    drive = get_drive_service()
+    meta = await asyncio.to_thread(
+        lambda: drive.files().get(
+            fileId=file_id, fields="id, name, mimeType", supportsAllDrives=True
+        ).execute()
+    )
+    mime = meta.get("mimeType", "")
+    if not mime.startswith(_GOOGLE_NATIVE_PREFIX):
+        return {
+            "success": False,
+            "error": (
+                f"'{meta.get('name')}' ({mime}) is not a Google-native file, so it has no "
+                f"export conversion. Use gdrive_download_file to fetch its bytes."
+            ),
+        }
+    export_mime = mime_type or _EXPORT_DEFAULT_MIME
+    data = await asyncio.to_thread(
+        lambda: drive.files().export(fileId=file_id, mimeType=export_mime).execute()
+    )
+    with open(local_path, "wb") as f:
+        f.write(data)
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "name": meta.get("name"),
+            "source_mime_type": mime,
+            "export_mime_type": export_mime,
+            "local_path": local_path,
+            "bytes_written": len(data),
+        },
+    }
+
+
+@handle_google_errors
+async def gdrive_upload_file(
+    local_path: str,
+    folder_id: str,
+    name: Optional[str] = None,
+    mime_type: Optional[str] = None,
+) -> dict:
+    """Upload a local file into a Drive folder as a NEW file.
+
+    `name` defaults to the local basename; `mime_type` is guessed from the
+    extension when omitted. To replace the content of an existing file while
+    keeping its id and links, use gdrive_upload_new_version instead.
+    """
+    if not os.path.isfile(local_path):
+        return {"success": False, "error": f"Local file not found: {local_path}"}
+    drive = get_drive_service()
+    media = MediaFileUpload(local_path, mimetype=mime_type, resumable=True)
+    body = {"name": name or os.path.basename(local_path), "parents": [folder_id]}
+    created = await asyncio.to_thread(
+        lambda: drive.files().create(
+            body=body,
+            media_body=media,
+            fields="id, name, mimeType, size, webViewLink, parents",
+            supportsAllDrives=True,
+        ).execute()
+    )
+    return {"success": True, "data": created}
+
+
+@handle_google_errors
+async def gdrive_upload_new_version(
+    file_id: str, local_path: str, mime_type: Optional[str] = None
+) -> dict:
+    """Replace an existing Drive file's content with a new version.
+
+    The file id, name, sharing, and links all stay stable; Drive keeps the prior
+    content in version history. This is the tool for the
+    new-version-against-a-ledgered-id workflow.
+    """
+    if not os.path.isfile(local_path):
+        return {"success": False, "error": f"Local file not found: {local_path}"}
+    drive = get_drive_service()
+    media = MediaFileUpload(local_path, mimetype=mime_type, resumable=True)
+    updated = await asyncio.to_thread(
+        lambda: drive.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields="id, name, mimeType, size, version, modifiedTime, webViewLink",
+            supportsAllDrives=True,
+        ).execute()
+    )
+    return {"success": True, "data": updated}
