@@ -24,6 +24,7 @@ import logging
 import os
 
 from .auth import get_forms_service, get_script_service
+from .forms_questions import _CHOICE_TYPES, _build_question  # noqa: F401
 from .guardrails import handle_google_errors
 
 logger = logging.getLogger(__name__)
@@ -44,8 +45,6 @@ _SHIM_SETUP = (
     "(or pass shim_script_id)."
 )
 
-# Map a friendly question type -> how to build its question body.
-_CHOICE_TYPES = {"CHECKBOX", "RADIO", "DROP_DOWN"}
 
 
 def _summarize_item(item: dict) -> dict:
@@ -196,6 +195,121 @@ async def forms_set_destination(
     }
 
 
+_RESTRICTED_HINT = (
+    "The responder link answers only to accounts in this Workspace organization "
+    "(anonymous GET returned a sign-in page). No API setting lifts this; in the "
+    "form's Settings > Responses turn off 'Restrict to users in <org> and trusted "
+    "organizations' before sharing it outside the organization."
+)
+
+
+def _anonymous_status(url: str) -> int | None:
+    """GET a URL with no credentials and return the HTTP status (None on a
+    network error). Used to tell whether a form's responder page is public."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:  # noqa: S310
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:  # noqa: BLE001
+        return None
+
+
+@handle_google_errors
+async def forms_create(
+    title: str,
+    document_title: str | None = None,
+    description: str | None = None,
+    folder_id: str | None = None,
+    questions: list | None = None,
+    check_access: bool = True,
+) -> dict:
+    """Create a NEW Google Form (forms.create), then in one batchUpdate set the
+    description and add `questions`, then move the file into `folder_id`.
+
+    `title`: the title respondents see. `document_title`: the Drive file name
+    (defaults to `title`). `questions`: list of {"title", "type", "options",
+    "required"} using forms_add_question's vocabulary, created in list order.
+    `check_access`: anonymous-fetch the responder URL and report whether the
+    form is restricted to the organization (a Workspace default that no API
+    setting changes; the returned hint says which UI toggle lifts it)."""
+    svc = get_forms_service()
+    info = {"title": title, "documentTitle": document_title or title}
+    created = await asyncio.to_thread(lambda: svc.forms().create(body={"info": info}).execute())
+    form_id = created["formId"]
+    edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+
+    requests: list = []
+    if description:
+        requests.append(
+            {"updateFormInfo": {"info": {"description": description}, "updateMask": "description"}}
+        )
+    titles = []
+    for i, q in enumerate(questions or []):
+        try:
+            question = _build_question(q.get("type", "PARAGRAPH"), q.get("options"), q.get("required", False))
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": f"question {i} ({q.get('title', '')!r}): {e}",
+                "data": {"form_id": form_id, "edit_url": edit_url},
+            }
+        requests.append(
+            {
+                "createItem": {
+                    "item": {"title": q.get("title", ""), "questionItem": {"question": question}},
+                    "location": {"index": i},
+                }
+            }
+        )
+        titles.append(q.get("title", ""))
+    replies = []
+    if requests:
+        body = {"requests": requests, "includeFormInResponse": False}
+        res = await asyncio.to_thread(
+            lambda: svc.forms().batchUpdate(formId=form_id, body=body).execute()
+        )
+        replies = res.get("replies", [])
+    item_ids = [r["createItem"]["itemId"] for r in replies if "createItem" in r]
+
+    moved = None
+    if folder_id:
+        from .drive import gdrive_move_file
+
+        moved = await gdrive_move_file(form_id, folder_id)
+
+    final = await asyncio.to_thread(lambda: svc.forms().get(formId=form_id).execute())
+    responder = final.get("responderUri", "")
+    access = None
+    if check_access and responder:
+        status = await asyncio.to_thread(_anonymous_status, responder)
+        restricted = status != 200
+        access = {"anonymous_http_status": status, "restricted_to_organization": restricted}
+        if restricted:
+            access["hint"] = _RESTRICTED_HINT
+
+    return {
+        "success": True,
+        "data": {
+            "form_id": form_id,
+            "edit_url": edit_url,
+            "responder_uri": responder,
+            "title": title,
+            "document_title": info["documentTitle"],
+            "item_count": len(final.get("items", [])),
+            "created_item_ids": item_ids,
+            "created_item_titles": titles,
+            "folder_id": folder_id,
+            "moved": (moved or {}).get("data", {}).get("moved") if moved else None,
+            "publish_settings": final.get("publishSettings"),
+            "access": access,
+        },
+    }
+
+
 @handle_google_errors
 async def forms_add_question(
     form_id: str,
@@ -221,28 +335,10 @@ async def forms_add_question(
         cur = await asyncio.to_thread(lambda: svc.forms().get(formId=form_id).execute())
         index = len(cur.get("items", []))
 
-    question: dict = {"required": bool(required)}
-    if t in _CHOICE_TYPES:
-        if not options:
-            return {
-                "success": False,
-                "error": f"type {t} requires a non-empty `options` list.",
-                "data": {"form_id": form_id},
-            }
-        question["choiceQuestion"] = {
-            "type": t,
-            "options": [{"value": str(o)} for o in options],
-        }
-    elif t in ("SHORT_TEXT", "TEXT"):
-        question["textQuestion"] = {"paragraph": False}
-    elif t in ("PARAGRAPH", "PARAGRAPH_TEXT"):
-        question["textQuestion"] = {"paragraph": True}
-    else:
-        return {
-            "success": False,
-            "error": f"unsupported type {t!r}; use CHECKBOX|RADIO|DROP_DOWN|SHORT_TEXT|PARAGRAPH.",
-            "data": {"form_id": form_id},
-        }
+    try:
+        question = _build_question(t, options, required)
+    except ValueError as e:
+        return {"success": False, "error": str(e), "data": {"form_id": form_id}}
 
     request = {
         "createItem": {

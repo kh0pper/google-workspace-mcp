@@ -757,6 +757,30 @@ async def apps_script_run(
 # --- Google Forms Tools (read structure; edit questions IN PLACE, URL preserved) ---
 
 @mcp.tool()
+async def forms_create(
+    title: str,
+    document_title: Optional[str] = None,
+    description: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    questions: Optional[list] = None,
+    check_access: bool = True,
+) -> dict:
+    """Create a NEW Google Form: title (+ Drive file name `document_title`), optional description, optional
+    `questions` = [{"title", "type": CHECKBOX|RADIO|DROP_DOWN|SHORT_TEXT|PARAGRAPH, "options", "required"}] created in
+    order, optional move into `folder_id`. Returns form_id, edit_url, responder_uri, item ids, and an access check:
+    a new form is usually restricted to the Workspace organization (no API lifts it); the result says so and names the
+    Settings > Responses toggle to flip before sharing outside the org. Use forms_batch_update for further edits."""
+    return await forms.forms_create(
+        title,
+        document_title=document_title,
+        description=description,
+        folder_id=folder_id,
+        questions=questions,
+        check_access=check_access,
+    )
+
+
+@mcp.tool()
 async def forms_get_structure(form_id: str) -> dict:
     """Read a Google Form's structure: title, the public responder URL, the linked response sheet, and every item
     (item_id, title, kind; for choice questions: choice_type RADIO|CHECKBOX|DROP_DOWN + options + required). Read this
