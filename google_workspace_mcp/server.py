@@ -9,7 +9,9 @@ formatting destruction).
 import logging
 from typing import Optional
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
+
+from .actor_label import actor_from_context
 
 from . import docs, drive, comments, gmail, sheets, slides, apps_script, forms
 from . import calendar as gcal_mod
@@ -331,18 +333,23 @@ async def gdocs_list_comments(
 
 @mcp.tool()
 async def gdocs_add_comment(
-    doc_id: str, content: str, quoted_text: Optional[str] = None
+    doc_id: str, content: str, quoted_text: Optional[str] = None,
+    ctx: Context = None,
 ) -> dict:
     """Add a comment to a Drive file, optionally anchored to specific text. Works on ANY Drive file (PDFs, images, uploaded docx), not only Google Docs."""
-    return await comments.gdocs_add_comment(doc_id, content, quoted_text)
+    return await comments.gdocs_add_comment(
+        doc_id, content, quoted_text, actor=actor_from_context(ctx)
+    )
 
 
 @mcp.tool()
 async def gdocs_reply_comment(
-    doc_id: str, comment_id: str, content: str
+    doc_id: str, comment_id: str, content: str, ctx: Context = None
 ) -> dict:
     """Reply to a comment on a Drive file. Works on ANY Drive file (PDFs, images, uploaded docx), not only Google Docs."""
-    return await comments.gdocs_reply_comment(doc_id, comment_id, content)
+    return await comments.gdocs_reply_comment(
+        doc_id, comment_id, content, actor=actor_from_context(ctx)
+    )
 
 
 @mcp.tool()
@@ -353,7 +360,8 @@ async def gdocs_resolve_comment(doc_id: str, comment_id: str) -> dict:
 
 @mcp.tool()
 async def gdocs_apply_comment_edit(
-    doc_id: str, comment_id: str, replace_text: str, summary: str
+    doc_id: str, comment_id: str, replace_text: str, summary: str,
+    ctx: Context = None,
 ) -> dict:
     """Atomic: apply edit from comment + reply with summary + resolve.
 
@@ -368,7 +376,7 @@ async def gdocs_apply_comment_edit(
     reply, resolves the comment, and sets data.applied = false.
     """
     return await comments.gdocs_apply_comment_edit(
-        doc_id, comment_id, replace_text, summary
+        doc_id, comment_id, replace_text, summary, actor=actor_from_context(ctx)
     )
 
 

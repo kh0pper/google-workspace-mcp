@@ -10,6 +10,7 @@ import html
 import logging
 from typing import Optional
 
+from .actor_label import label_text
 from .auth import get_drive_service
 from .guardrails import handle_google_errors
 
@@ -110,12 +111,13 @@ async def gdocs_list_comments(
 
 @handle_google_errors
 async def gdocs_add_comment(
-    doc_id: str, content: str, quoted_text: Optional[str] = None
+    doc_id: str, content: str, quoted_text: Optional[str] = None,
+    actor: Optional[dict] = None,
 ) -> dict:
     """Add a comment to a Google Doc, optionally anchored to text."""
     drive = get_drive_service()
 
-    body: dict = {"content": content}
+    body: dict = {"content": label_text(content, actor)}
     if quoted_text:
         body["quotedFileContent"] = {
             "mimeType": "text/plain",
@@ -143,7 +145,7 @@ async def gdocs_add_comment(
 
 @handle_google_errors
 async def gdocs_reply_comment(
-    doc_id: str, comment_id: str, content: str
+    doc_id: str, comment_id: str, content: str, actor: Optional[dict] = None
 ) -> dict:
     """Reply to a comment on a Google Doc."""
     drive = get_drive_service()
@@ -151,7 +153,7 @@ async def gdocs_reply_comment(
     result = await asyncio.to_thread(
         lambda: drive.replies().create(
             fileId=doc_id, commentId=comment_id,
-            body={"content": content},
+            body={"content": label_text(content, actor)},
             fields="id,content,author(displayName),createdTime,action",
         ).execute()
     )
@@ -192,7 +194,8 @@ async def gdocs_resolve_comment(doc_id: str, comment_id: str) -> dict:
 
 @handle_google_errors
 async def gdocs_apply_comment_edit(
-    doc_id: str, comment_id: str, replace_text: str, summary: str
+    doc_id: str, comment_id: str, replace_text: str, summary: str,
+    actor: Optional[dict] = None,
 ) -> dict:
     """Atomic edit-from-comment workflow.
 
@@ -276,7 +279,7 @@ async def gdocs_apply_comment_edit(
         await asyncio.to_thread(
             lambda: drive.replies().create(
                 fileId=doc_id, commentId=comment_id,
-                body={"content": reply_text},
+                body={"content": label_text(reply_text, actor)},
                 fields="id",
             ).execute()
         )
@@ -296,7 +299,7 @@ async def gdocs_apply_comment_edit(
     await asyncio.to_thread(
         lambda: drive.replies().create(
             fileId=doc_id, commentId=comment_id,
-            body={"content": summary},
+            body={"content": label_text(summary, actor)},
             fields="id",
         ).execute()
     )
